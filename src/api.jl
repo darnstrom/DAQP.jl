@@ -162,9 +162,9 @@ function update(daqp::DAQP.Model, H,f,A,bupper,blower,sense)
   exitflag = ccall((:update_ldp,DAQP.libdaqp),Cint,(Cint,Ptr{DAQP.Workspace},), update_mask, daqp.work);
 end
 
-function setup_c_workspace(nth)::Ptr{Cvoid}
+function setup_c_workspace(n)::Ptr{Cvoid}
   p = Libc.calloc(1,sizeof(DAQP.Workspace)); 
-  ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint),p, nth);
+  ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint),p, n);
   ccall((:allocate_daqp_settings,libdaqp), Cvoid, (Ptr{Cvoid},),p);
   return p
 end
@@ -174,7 +174,7 @@ function free_c_workspace(p::Ptr{Cvoid})
   Libc.free(p)
 end
 
-function init_c_workspace_problem(p::Ptr{Cvoid},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing) 
+function init_c_workspace_ldp(p::Ptr{Cvoid},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint}; max_radius=nothing) 
   # Set fval_bound to maximal radius for early termination
   if(!isnothing(max_radius))
 	d_work = unsafe_load(Ptr{DAQP.Workspace}(p));
