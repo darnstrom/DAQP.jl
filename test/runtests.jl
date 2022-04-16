@@ -37,7 +37,6 @@ end
 
   # Test access settings
   s = DAQP.settings(d)
-  println(s)
   @test s.primal_tol==1e-6
   DAQP.settings(d,Dict(:primal_tol=>1e-5))
   s = DAQP.settings(d)
@@ -60,7 +59,6 @@ end
 
   # Test access settings
   s = DAQP.settings(d)
-  println(s)
   @test s.primal_tol==1e-6
   DAQP.settings(d,Dict(:primal_tol=>1e-5))
   s = DAQP.settings(d)
