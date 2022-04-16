@@ -60,9 +60,6 @@ end
   DAQP.update(d,H,f,A,bupper,blower,sense)
   x,fval,exitflag,info = DAQP.solve(d)
   @test norm(xref-x) < tol
-
-  # Delete the model
-  DAQP.delete!(d);
 end
 
 @testset "C LDP interface" begin
