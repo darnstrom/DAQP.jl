@@ -47,6 +47,7 @@ end
   DAQP.setup(d,H,f,A,bupper,blower,sense)
   x,fval,exitflag,info = DAQP.solve(d)
   @test norm(xref-x) < tol
+  @test norm(H*x+[I(n)[1:ms,:];A]'*info.λ+f) < tol
 
   # Test access settings
   s = DAQP.settings(d)

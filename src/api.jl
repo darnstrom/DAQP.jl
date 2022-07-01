@@ -39,13 +39,15 @@ function quadprog(qpj::QPj)
 
   # Setup output struct
   xstar = zeros(Float64,qp.n); 
-  result= Ref(DAQPResult(xstar));
+  lam= zeros(Float64,qp.m); 
+  result= Ref(DAQPResult(xstar,lam));
 
   ccall((:daqp_quadprog, DAQP.libdaqp), Nothing,
 		(Ref{DAQP.DAQPResult},Ref{DAQP.QPc},Ref{DAQP.DAQPSettings}), 
 		result,Ref(qp),Ptr{DAQP.DAQPSettings}(C_NULL))
   
-  info = (status = DAQP.flag2status[result[].exitflag],
+  info = (λ=lam,
+		  status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
 		  iterations= result[].iter)
@@ -98,13 +100,15 @@ end
 
 function solve(daqp::DAQP.Model)
   xstar = zeros(Float64,daqp.qpc.n); 
-  result= Ref(DAQPResult(xstar));
+  lam = zeros(Float64,daqp.qpc.m); 
+  result= Ref(DAQPResult(xstar,lam));
 
   exitflag=ccall((:daqp_solve, DAQP.libdaqp), Cint,
 		(Ref{DAQP.DAQPResult},Ref{DAQP.Workspace}), 
 		result,daqp.work)
   
-  info = (status = DAQP.flag2status[result[].exitflag],
+  info = (λ=lam,
+		  status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
 		  iterations= result[].iter)

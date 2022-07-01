@@ -63,6 +63,7 @@ end
 
 struct DAQPResult
   x::Ptr{Cdouble}
+  lam::Ptr{Cdouble}
   fval::Cdouble
   soft_slack::Cdouble
 
@@ -72,8 +73,8 @@ struct DAQPResult
   setup_time::Cdouble
 end
 
-function DAQPResult(x::Vector{Float64})
-  return DAQPResult(pointer(x),0,0,0,0,0,0)
+function DAQPResult(x::Vector{Float64},lam::Vector{Float64})
+  return DAQPResult(pointer(x),pointer(lam),0,0,0,0,0,0)
 end
 
 struct Workspace
