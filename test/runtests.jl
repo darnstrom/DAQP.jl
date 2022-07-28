@@ -40,6 +40,27 @@ end
   @test isempty(AS)
 end
 
+@testset "BnB" begin
+    nb = 10
+    ϵb= 1e-5
+    nMIQPs = 5
+    for nMIQP = 1:nMIQPs
+        M = randn(n,n)
+        H = M'*M
+        A = randn(m-ms,n);
+        bupper = 20*rand(m); blower = -20*rand(m) # ensure that origin is feasible
+        f = 100*randn(n); f[1:nb].=-abs.(f[1:nb]) # make it lucrative to avoid origin
+        # Make first nb variables binary
+        bupper[1:nb].=1
+        blower[1:nb].=0
+        sense = zeros(Cint,m)
+        sense[1:nb].=DAQP.BINARY
+        x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
+        @test exitflag == 1 # was able to solve problem
+        @test all((abs.(x[1:nb].-1.0).<ϵb) .| (abs.(x[1:nb]).<ϵb)) # is binary feasible
+    end
+end
+
 @testset "Model interface" begin
   # Setup model and solve problem
   d = DAQP.Model()
