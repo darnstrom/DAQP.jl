@@ -81,9 +81,12 @@ mutable struct Model
 end
 
 function delete!(daqp::DAQP.Model)
-  workspace = unsafe_load(daqp.work);
-  ccall((:free_daqp_workspace,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
-  Libc.free(daqp.work);
+  if(daqp.work != C_NULL)
+      workspace = unsafe_load(daqp.work);
+      ccall((:free_daqp_workspace,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
+      Libc.free(daqp.work);
+      daqp.work = C_NULL
+  end
 end
 
 function setup(daqp::DAQP.Model, qp::DAQP.QPj)
