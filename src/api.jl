@@ -47,10 +47,10 @@ function quadprog(qpj::QPj)
 		result,Ref(qp),Ptr{DAQP.DAQPSettings}(C_NULL))
   
   info = (λ=lam,
-		  status = DAQP.flag2status[result[].exitflag],
-		  solve_time = result[].solve_time,
-		  setup_time = result[].setup_time,
-		  iterations= result[].iter)
+          status = DAQP.flag2status[result[].exitflag],
+          solve_time = result[].solve_time,
+          setup_time = result[].setup_time,
+          iterations= result[].iter)
   return xstar,result[].fval,result[].exitflag,info
 end
 
@@ -88,10 +88,10 @@ end
 
 function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   daqp.qpj = qp
-  daqp.qpc = DAQP.QPc(daqp.qpj);
-  return ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ref{DAQP.QPc}, Ptr{DAQP.Workspace}),
-			   Ref{DAQP.QPc}(daqp.qpc), daqp.work)
-
+  daqp.qpc = DAQP.QPc(daqp.qpj)
+  setup_time = Cdouble(0);
+  exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ref{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), Ref{DAQP.QPc}(daqp.qpc), daqp.work, Ref{Cdouble}(setup_time))
+  return exitflag
 end
 
 function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint})
