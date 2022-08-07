@@ -279,12 +279,6 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
-    println(H)
-    println(f)
-    display(A)
-    println(bupper)
-    println(blower)
-    println(sense)
     # setup solver
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
     if(exitflag >= 0)
@@ -531,7 +525,6 @@ function extract_b(
     s::SupportedSets,
 )
 
-    println(s)
     i = (s==MOI.ZeroOne()) ? MOI.Interval(0,1) : MOI.Interval(s)
     extract_b(bu,bl,sense, row, MOI.Interval(max(i.lower,bl[row]),min(i.upper,bu[row])))
     if(s==MOI.ZeroOne()) sense[row] = BINARY end # Mark binary constraints
@@ -599,7 +592,6 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
             fquadratic = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction}())
             for term in fquadratic.quadratic_terms
                 i,j = Int(idxmap[term.variable_1].value),Int(idxmap[term.variable_2].value)
-                println("element $i,$j  is $(term.coefficient)")
                 H[i,j] += term.coefficient
                 if(i!=j)
                     H[j,i] += term.coefficient
