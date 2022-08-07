@@ -383,8 +383,8 @@ function process_constraints(
 )
 
     rowranges = dest.rowranges
-    m = mapreduce(last, max, values(rowranges), init=0)
     n = MOI.get(src, MOI.NumberOfVariables())
+    m = max(n,mapreduce(last, max, values(rowranges), init=0))
 
     A = zeros(Cdouble,n,m-n)
     bupper = Vector{Cdouble}(undef, m)
@@ -394,6 +394,7 @@ function process_constraints(
 
     bupper[1:n].=1e30;
     blower[1:n].=-1e30;
+    offset[1:n].=0;
     sense[1:n].= IMMUTABLE
 
 
@@ -550,7 +551,7 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
     n = MOI.get(src, MOI.NumberOfVariables())
 
     if sense == MOI.FEASIBILITY_SENSE
-        H = nothing # TODO: make sure nothing is transformed in to C_NULL
+        H = Matrix{Cdouble}(I(n))# TODO: use nothing instead 
         f = zeros(n); 
         c = 0.0
     else
@@ -568,7 +569,11 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
             fquadratic = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction}())
             for term in fquadratic.quadratic_terms
                 i,j = Int(idxmap[term.variable_1].value),Int(idxmap[term.variable_2].value)
-                H[i,j] = term.coefficient
+                println("element $i,$j  is $(term.coefficient)")
+                H[i,j] += term.coefficient
+                if(i!=j)
+                    H[j,i] += term.coefficient
+                end
             end
             process_objective_linearterm!(f, fquadratic.affine_terms, idxmap)
             c = fquadratic.constant
