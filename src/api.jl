@@ -126,6 +126,13 @@ function settings(daqp::DAQP.Model)
 	return unsafe_load(workspace.settings)
   end
 end
+function settings(daqp::DAQP.Model, new_settings::DAQP.DAQPSettings)
+  workspace = unsafe_load(daqp.work);
+  if(workspace.settings != C_NULL)
+	unsafe_store!(workspace.settings,new_settings)
+  end
+  return new_settings
+end
 function settings(daqp::DAQP.Model,changes::Dict{Symbol,<:Any})
   workspace = unsafe_load(daqp.work);
   if(workspace.settings == C_NULL) return end
