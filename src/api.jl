@@ -95,11 +95,11 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   daqp.qpc = DAQP.QPc(daqp.qpj)
   setup_time = Cdouble(0);
   exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ref{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), Ref{DAQP.QPc}(daqp.qpc), daqp.work, Ref{Cdouble}(setup_time))
-  return exitflag
+  return exitflag, setup_time
 end
 
 function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint};A_rowmaj=false)
-  setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj))
+  return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj))
 end
 
 function solve(daqp::DAQP.Model)

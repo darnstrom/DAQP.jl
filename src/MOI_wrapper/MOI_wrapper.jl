@@ -65,6 +65,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sense::MOI.OptimizationSense
     objconstant::Cdouble
     rowranges::Dict{Int, UnitRange{Int}}
+    setup_time::Cdouble
     info #TODO: specify type
 
     function Optimizer(; user_settings...)
@@ -74,7 +75,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         sense = MOI.MIN_SENSE
         objconstant = 0.0 
         rowranges = Dict{Int, UnitRange{Int}}()
-        optimizer = new(model,has_results,is_empty,sense,objconstant,rowranges,nothing)
+        setup_time = 0.0
+        optimizer = new(model,has_results,is_empty,sense,objconstant,rowranges,setup_time,nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -139,9 +141,9 @@ MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.3.0"
 MOI.get(opt::Optimizer, ::MOI.RawSolver)         = opt.model
 MOI.get(opt::Optimizer, ::MOI.ResultCount)       = opt.has_results ? 1 : 0
 MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) = opt.model.n
-MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)      = opt.info.solve_time+opt.info.setup_time
+MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)      = opt.info.solve_time+opt.setup_time
 MOI.get(opt::Optimizer, ::MOI.RawStatusString)   = string(opt.info.status)
-MOI.get(opt::Optimizer, ::MOI.SimplexIterations) = opts.info.iterations
+MOI.get(opt::Optimizer, ::MOI.SimplexIterations) = Int64(opt.info.iterations)
 
 function MOI.get(opt::Optimizer, a::O) where {O<:Union{ MOI.DualObjectiveValue, 
                                                         MOI.ObjectiveValue}}
@@ -252,7 +254,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     println(blower)
     println(sense)
     # setup solver
-    exitflag = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+    exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
     if(exitflag >= 0)
         dest.is_empty = false
     else
