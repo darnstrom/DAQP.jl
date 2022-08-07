@@ -6,7 +6,7 @@ export Optimizer
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 
-const Interval = MOI.Interval{Float64}
+const Interval = MOI.Interval{Cdouble}
 
 const Affine = MOI.ScalarAffineFunction{Cdouble}
 const Quadratic = MOI.ScalarQuadraticFunction{Cdouble}
@@ -468,7 +468,7 @@ function extract_offset(offset::Vector{Cdouble}, row::Int, f::Affine)
 end
 
 function extract_offset(
-    offset::Vector{Float64},
+    offset::Vector{Cdouble},
     rows::UnitRange{Int},
     f::VectorAffine,
 )
