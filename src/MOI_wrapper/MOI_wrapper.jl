@@ -101,8 +101,10 @@ end
 MOI.is_empty(optimizer::Optimizer) = optimizer.is_empty
 
 function MOI.optimize!(optimizer::Optimizer)
-    ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
-    optimizer.has_results = true
+    if(!optimizer.is_empty)
+        ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
+        optimizer.has_results = true
+    end
     return
 end
 
@@ -237,28 +239,25 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
 
     #assemble the constraints data
     assign_constraint_row_ranges!(dest.rowranges, idxmap, src)
-    println("idxmap:")
-    println(idxmap)
-    println("rowranges:")
-    println(dest.rowranges)
     A, bupper, blower, sense = process_constraints(dest, src, idxmap)
 
     #assemble the objective data
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
-    #call setup solver.   This will flush all
-    #internal data but will keep settings intact
     println(H)
     println(f)
-    println(A)
+    display(A)
     println(bupper)
     println(blower)
     println(sense)
-    DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
-
-    #model is no longer empty
-    dest.is_empty = false
+    # setup solver
+    exitflag = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+    if(exitflag >= 0)
+        dest.is_empty = false
+    else
+        error("DAQP currently only supports strictly convex objectives")
+    end
 
     return idxmap
 end
