@@ -293,20 +293,20 @@ function assign_constraint_row_ranges!(
     src::MOI.ModelLike
 )
 
-    startrow = 1
-    # startrow += n 
+    startrow = 1+MOI.get(src, MOI.NumberOfVariables())
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         cis_src = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
         for ci_src in cis_src
             set = MOI.get(src, MOI.ConstraintSet(), ci_src)
             ci_dest = idxmap[ci_src]
-            #if(S!=MOI.VariableIndex)
+            if(F!=MOI.VariableIndex)
                 endrow = startrow + MOI.dimension(set) - 1
                 rowranges[ci_dest.value] = startrow : endrow
                 startrow = endrow + 1
-            #else
-            #    rowranges[ci_dest.value] = ci_src.VI
-            #end
+            else
+                var_id = MOI.get(src, MOI.ConstraintFunction(), ci_src).value
+                rowranges[ci_dest.value] = var_id:var_id
+            end
         end
     end
 
@@ -344,19 +344,21 @@ function process_constraints(
 )
 
     rowranges = dest.rowranges
-    m = mapreduce(length, +, values(rowranges), init=0)
+    m = mapreduce(last, max, values(rowranges), init=0)
     n = MOI.get(src, MOI.NumberOfVariables())
 
-    # TODO, handle simple...
-    A = zeros(Cdouble,n,m) 
+    A = zeros(Cdouble,n,m-n)
     bupper = Vector{Cdouble}(undef, m)
     blower = Vector{Cdouble}(undef, m)
     offset = Vector{Cdouble}(undef, m)
     sense  = Vector{Cint}(undef,m)
 
+    bupper[1:n].=1e30;
+    blower[1:n].=-1e30;
+    sense[1:n].= IMMUTABLE
+
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
-        println("$F  $S" )
         process_constraints!(A, bupper, blower, sense, offset,
                             src, idxmap, rowranges, 
                             F, S)
@@ -380,14 +382,15 @@ function process_constraints!(
     F::Type{<:MOI.AbstractFunction},
     S::Type{<:MOI.AbstractSet},
 )
+    n = MOI.get(src, MOI.NumberOfVariables())
     cis_src = MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
     for ci in cis_src
         s = MOI.get(src, MOI.ConstraintSet(), ci)
         f = MOI.get(src, MOI.ConstraintFunction(), ci)
         rows = constraint_rows(rowranges, idxmap[ci])
         extract_offset(offset, rows, f)
-        extract_A(A, f, rows, idxmap)
-        extract_b(bupper, blower, sense, rows, s)
+        extract_A(A, f, rows.-n, idxmap)
+        extract_b(bupper, blower, sense, rows, f, s)
     end
     return
 end
@@ -443,9 +446,23 @@ function extract_b(
     blower::Vector{Cdouble},
     sense::Vector{Cint},
     row::Int,
+    f::Affine,
     s::SupportedSets,
 )
-    return extract_b(bupper,blower,sense, row, MOI.Interval(s))
+    extract_b(bupper,blower,sense, row, MOI.Interval(s))
+    return
+end
+function extract_b(
+    bupper::Vector{Cdouble},
+    blower::Vector{Cdouble},
+    sense::Vector{Cint},
+    row::Int,
+    f::MOI.VariableIndex,
+    s::SupportedSets,
+)
+    i=MOI.Interval(s)
+    extract_b(bupper,blower,sense, row,
+              MOI.Interval(max(i.lower,blower[row]),min(i.upper,bupper[row])))
 end
 
 function extract_b(
@@ -473,6 +490,7 @@ function extract_b(
     bl::Vector{Cdouble},
     sense::Vector{Cint},
     rows::UnitRange{Int},
+    f,
     s::S,
 ) where {S<:SupportedVectorSets}
     for (i, row) in enumerate(rows)
