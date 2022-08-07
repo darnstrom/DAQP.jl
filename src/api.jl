@@ -76,6 +76,7 @@ mutable struct Model
 	# Setup initial model
 	work = Libc.calloc(1,sizeof(DAQP.Workspace))
 	daqp= new(Ptr{DAQP.Workspace}(work))
+	ccall((:allocate_daqp_settings,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),work)
 	finalizer(DAQP.delete!, daqp)
 	return daqp 
   end
