@@ -239,6 +239,8 @@ MOI.supports(
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     idxmap = MOIU.IndexMap(dest, src)
 
+    copy_to_check_attributes(dest,src)
+
     #assemble the constraints data
     assign_constraint_row_ranges!(dest.rowranges, idxmap, src)
     A, bupper, blower, sense = process_constraints(dest, src, idxmap)
@@ -264,6 +266,41 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     return idxmap
 end
 
+function copy_to_check_attributes(dest, src)
+
+    #allowable model attributes
+    for attr in MOI.get(src, MOI.ListOfModelAttributesSet())
+        if attr == MOI.Name()           ||
+           attr == MOI.ObjectiveSense() ||
+           attr isa MOI.ObjectiveFunction
+            continue
+        end
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+
+    #allowable variable attributes
+    for attr in MOI.get(src, MOI.ListOfVariableAttributesSet())
+        if attr == MOI.VariableName()
+            continue
+        end
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+
+    #allowable constraint types and attributes
+    for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
+        if !MOI.supports_constraint(dest, F, S)
+            throw(MOI.UnsupportedConstraint{F, S}())
+        end
+        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F, S}())
+            if attr == MOI.ConstraintName()
+                continue
+            end
+            throw(MOI.UnsupportedAttribute(attr))
+        end
+    end
+
+    return nothing
+end
 
 #Set up index map from `src` variables and constraints to `dest` variables and constraints.
 
