@@ -66,6 +66,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     objconstant::Cdouble
     rowranges::Dict{Int, UnitRange{Int}}
     setup_time::Cdouble
+    silent::Bool
     info #TODO: specify type
 
     function Optimizer(; user_settings...)
@@ -76,7 +77,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         objconstant = 0.0 
         rowranges = Dict{Int, UnitRange{Int}}()
         setup_time = 0.0
-        optimizer = new(model,has_results,is_empty,sense,objconstant,rowranges,setup_time,nothing)
+        silent=true
+        optimizer = new(model,has_results,is_empty,sense,
+                        objconstant,rowranges,setup_time,silent,nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -192,17 +195,44 @@ function MOI.get(
 
     MOI.check_result_index_bounds(opt, a)
     rows = constraint_rows(opt.rowranges, ci)
-    return opt.info.λ[rows] 
+
+    if(opt.sense != MOI.FEASIBILITY_SENSE)
+        λ=abs.(opt.info.λ[rows]) # λ for lower bounds ≥ 0 in MOI
+    else
+        λ = (length(rows)>1) ? zeros(Cdouble,length(rows)) : 0.0
+    end
+    return λ
 end
+
+MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = true
+function MOI.get(
+    opt::Optimizer,
+      a::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{F, S}
+) where {F, S <: MOI.AbstractSet}
+
+     MOI.check_result_index_bounds(opt, a)
+     rows = constraint_rows(opt.rowranges, ci)
+     n = opt.model.qpj.n
+     Ax = (last(rows)<=n) ? opt.info.x[rows] : opt.model.qpj.A[:,rows.-n]'*opt.info.x
+     return min.(opt.model.qpj.bupper[rows]-Ax,Ax-opt.model.qpj.blower[rows])
+end
+
+#Currently there is no internal printing in DAQP
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.get(opt::Optimizer, ::MOI.Silent) = opt.silent
+MOI.set(opt::Optimizer, ::MOI.Silent, v::Bool) = (opt.silent=v)
+
+MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
+MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute) =
+    getproperty(settings(opt.model), Symbol(param.name))
+MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
+    settings(opt.model, Dict(Symbol(param.name)=>value))
 
 
 # not currently supported
-MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = false
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
-MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = false 
-MOI.supports(::Optimizer, ::MOI.Silent) = false
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = false
-
 
 ## Supported constraint types
 
