@@ -46,7 +46,8 @@ function quadprog(qpj::QPj)
 		(Ref{DAQP.DAQPResult},Ref{DAQP.QPc},Ref{DAQP.DAQPSettings}), 
 		result,Ref(qp),Ptr{DAQP.DAQPSettings}(C_NULL))
   
-  info = (λ=lam,
+  info = (x = xstar, λ=lam, fval=result[].fval,
+          exitflag=result[].exitflag,
           status = DAQP.flag2status[result[].exitflag],
           solve_time = result[].solve_time,
           setup_time = result[].setup_time,
@@ -110,8 +111,9 @@ function solve(daqp::DAQP.Model)
 		(Ref{DAQP.DAQPResult},Ref{DAQP.Workspace}), 
 		result,daqp.work)
   
-  info = (λ=lam,
-		  status = DAQP.flag2status[result[].exitflag],
+  info = (x = xstar, λ=lam, fval=result[].fval,
+          exitflag=result[].exitflag,
+          status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
 		  iterations= result[].iter)
