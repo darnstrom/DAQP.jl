@@ -18,7 +18,7 @@ const Interval = MOI.Interval{Cdouble}
 const LessThan = MOI.LessThan{Cdouble}
 const GreaterThan = MOI.GreaterThan{Cdouble}
 const EqualTo = MOI.EqualTo{Cdouble}
-const SupportedSets= Union{GreaterThan, LessThan, EqualTo, Interval}
+const SupportedSets= Union{GreaterThan, LessThan, EqualTo, Interval, MOI.ZeroOne}
 # mappings between MOI and internal definitions
 
 # TODO
@@ -453,16 +453,18 @@ function extract_b(
     return
 end
 function extract_b(
-    bupper::Vector{Cdouble},
-    blower::Vector{Cdouble},
+    bu::Vector{Cdouble},
+    bl::Vector{Cdouble},
     sense::Vector{Cint},
     row::Int,
     f::MOI.VariableIndex,
     s::SupportedSets,
 )
-    i=MOI.Interval(s)
-    extract_b(bupper,blower,sense, row,
-              MOI.Interval(max(i.lower,blower[row]),min(i.upper,bupper[row])))
+
+    println(s)
+    i = (s==MOI.ZeroOne()) ? MOI.Interval(0,1) : MOI.Interval(s)
+    extract_b(bu,bl,sense, row, MOI.Interval(max(i.lower,bl[row]),min(i.upper,bu[row])))
+    if(s==MOI.ZeroOne()) sense[row] = BINARY end # Mark binary constraints
 end
 
 function extract_b(
