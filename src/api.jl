@@ -98,8 +98,8 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   return exitflag
 end
 
-function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint})
-  setup(daqp,QPj(H,f,A,bupper,blower,sense))
+function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint};A_rowmaj=false)
+  setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj))
 end
 
 function solve(daqp::DAQP.Model)

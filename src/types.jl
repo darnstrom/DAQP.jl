@@ -16,14 +16,21 @@ function QPj()
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
 	A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
-	sense::Vector{Cint})
+	sense::Vector{Cint};A_rowmaj=false)
   # TODO: check consistency of dimensions
-  (mA,n) = size(A);
+  if(A_rowmaj)
+      (n,mA) = size(A);
+  else
+      (mA,n) = size(A);
+  end
   m = length(bupper);
   ms = m-mA;
   bin_ids = findall(sense.&BINARY .!=0).-1;
   nb = length(bin_ids)
-  return QPj(n,m,ms,H,f,A',bupper,blower,sense,bin_ids,nb) # Transpose A for col => row major
+  if(!A_rowmaj)
+      A = A' # Transpose A for col => row major
+  end
+  return QPj(n,m,ms,H,f,A,bupper,blower,sense,bin_ids,nb)
 end
 
 struct QPc 
