@@ -72,10 +72,12 @@ mutable struct Model
   work::Ptr{DAQP.Workspace}
   qpj::QPj
   qpc::QPc
+  qpc_ptr::Ptr{DAQP.QPc}
   function Model()
 	# Setup initial model
 	work = Libc.calloc(1,sizeof(DAQP.Workspace))
 	daqp= new(Ptr{DAQP.Workspace}(work))
+	daqp.qpc_ptr = Libc.calloc(1,sizeof(DAQP.QPc))
 	ccall((:allocate_daqp_settings,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),work)
 	finalizer(DAQP.delete!, daqp)
 	return daqp 
@@ -88,14 +90,21 @@ function delete!(daqp::DAQP.Model)
       ccall((:free_daqp_workspace,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
       Libc.free(daqp.work);
       daqp.work = C_NULL
+      Libc.free(daqp.qpc_ptr);
+      daqp.qpc_ptr = C_NULL
   end
 end
 
 function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   daqp.qpj = qp
   daqp.qpc = DAQP.QPc(daqp.qpj)
+  unsafe_store!(daqp.qpc_ptr,daqp.qpc)
   setup_time = Cdouble(0);
-  exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ref{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), Ref{DAQP.QPc}(daqp.qpc), daqp.work, Ref{Cdouble}(setup_time))
+  exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ptr{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
+  if(exitflag < 0)
+	# XXX: if setup fails DAQP currently clears settings
+	ccall((:allocate_daqp_settings,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
+  end
   return exitflag, setup_time
 end
 
