@@ -51,7 +51,7 @@ function quadprog(qpj::QPj)
           status = DAQP.flag2status[result[].exitflag],
           solve_time = result[].solve_time,
           setup_time = result[].setup_time,
-          iterations= result[].iter)
+          iterations= result[].iter, nodes = result[].nodes)
   return xstar,result[].fval,result[].exitflag,info
 end
 
@@ -117,7 +117,7 @@ function solve(daqp::DAQP.Model)
           status = DAQP.flag2status[result[].exitflag],
 		  solve_time = result[].solve_time,
 		  setup_time = result[].setup_time,
-		  iterations= result[].iter)
+		  iterations= result[].iter, nodes = result[].nodes)
   return xstar,result[].fval,result[].exitflag,info
 end
 

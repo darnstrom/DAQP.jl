@@ -130,6 +130,7 @@ function Base.show(io::IO, optimizer::Optimizer)
             value = round(MOI.get(optimizer,MOI.ObjectiveValue()),digits=3)
             println(io, " : Optimal objective: $(value)")
             println(io, " : Iterations: $(MOI.get(optimizer,MOI.SimplexIterations()))")
+            println(io, " : Nodes: $(MOI.get(optimizer,MOI.NodeCount()))")
             solvetime = round.(optimizer.model.info.solve_time*1000,digits=2)
             println(io, " : Solve time: $(solvetime)ms")
         end
@@ -147,6 +148,7 @@ MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) = opt.model.n
 MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)      = opt.info.solve_time+opt.setup_time
 MOI.get(opt::Optimizer, ::MOI.RawStatusString)   = string(opt.info.status)
 MOI.get(opt::Optimizer, ::MOI.SimplexIterations) = Int64(opt.info.iterations)
+MOI.get(opt::Optimizer, ::MOI.NodeCount) = Int64(opt.info.nodes)
 
 function MOI.get(opt::Optimizer, a::O) where {O<:Union{ MOI.DualObjectiveValue, 
                                                         MOI.ObjectiveValue}}

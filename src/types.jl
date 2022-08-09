@@ -82,12 +82,13 @@ struct DAQPResult
 
   exitflag::Cint
   iter::Cint
+  nodes::Cint
   solve_time::Cdouble
   setup_time::Cdouble
 end
 
 function DAQPResult(x::Vector{Float64},lam::Vector{Float64})
-  return DAQPResult(pointer(x),pointer(lam),0,0,0,0,0,0)
+  return DAQPResult(pointer(x),pointer(lam),0,0,0,0,0,0,0)
 end
 
 struct Workspace
