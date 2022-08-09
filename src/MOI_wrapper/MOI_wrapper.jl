@@ -283,12 +283,20 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
 
     # setup solver
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
-    if(exitflag >= 0)
-        dest.is_empty = false
-    else
-        error("DAQP currently only supports strictly convex objectives")
+    if(exitflag < 0) # The objective is not strictly convex
+	    # try to regularize (proximal-point iterations)
+		settings(dest.model,Dict(:eps_prox=>1e-5))
+		println(settings(dest.model))
+		exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+		if(exitflag >= 0)
+		  if(any(sense.&BINARY==BINARY))
+			error("DAQP: the objective has to be strictly convex to support binary variables")
+		  end
+		else
+		  error("DAQP currently only supports convex objectives")
+		end
     end
-
+	dest.is_empty = false
     return idxmap
 end
 
