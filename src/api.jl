@@ -73,6 +73,7 @@ mutable struct Model
   qpj::QPj
   qpc::QPc
   qpc_ptr::Ptr{DAQP.QPc}
+  has_model::Bool
   function Model()
 	# Setup initial model
 	work = Libc.calloc(1,sizeof(DAQP.Workspace))
@@ -80,6 +81,7 @@ mutable struct Model
 	daqp.qpc_ptr = Libc.calloc(1,sizeof(DAQP.QPc))
 	ccall((:allocate_daqp_settings,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),work)
 	finalizer(DAQP.delete!, daqp)
+	daqp.has_model=false
 	return daqp 
   end
 end
@@ -98,12 +100,16 @@ end
 function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   daqp.qpj = qp
   daqp.qpc = DAQP.QPc(daqp.qpj)
+  old_settings = settings(daqp); # in case setup fails
   unsafe_store!(daqp.qpc_ptr,daqp.qpc)
   setup_time = Cdouble(0);
   exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ptr{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
   if(exitflag < 0)
 	# XXX: if setup fails DAQP currently clears settings
 	ccall((:allocate_daqp_settings,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
+	settings(daqp,old_settings)
+  else
+	daqp.has_model = true
   end
   return exitflag, setup_time
 end
@@ -113,6 +119,7 @@ function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix
 end
 
 function solve(daqp::DAQP.Model)
+  if(!daqp.has_model) return  zeros(0), NaN, -10, [] end
   xstar = zeros(Float64,daqp.qpc.n); 
   lam = zeros(Float64,daqp.qpc.m); 
   result= Ref(DAQPResult(xstar,lam));
