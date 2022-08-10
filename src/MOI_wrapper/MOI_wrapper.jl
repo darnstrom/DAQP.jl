@@ -201,7 +201,7 @@ function MOI.get(
     if(opt.sense != MOI.FEASIBILITY_SENSE)
         λ=abs.(opt.info.λ[rows]) # λ for lower bounds ≥ 0 in MOI
     else
-        λ = (length(rows)>1) ? zeros(Cdouble,length(rows)) : 0.0
+        λ = (S <: MOI.AbstractVectorSet) ? zeros(Cdouble,length(rows)) : 0.0
     end
     return λ
 end
