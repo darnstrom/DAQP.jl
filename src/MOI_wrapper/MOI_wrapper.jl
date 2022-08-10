@@ -12,8 +12,6 @@ const Affine = MOI.ScalarAffineFunction{Cdouble}
 const Quadratic = MOI.ScalarQuadraticFunction{Cdouble}
 const VectorAffine = MOI.VectorAffineFunction{Cdouble}
 
-const SupportedVectorSets = Union{MOI.Zeros,MOI.Nonnegatives,MOI.Nonpositives}
-
 const Interval = MOI.Interval{Cdouble}
 const LessThan = MOI.LessThan{Cdouble}
 const GreaterThan = MOI.GreaterThan{Cdouble}
@@ -64,7 +62,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     is_empty::Bool
     sense::MOI.OptimizationSense
     objconstant::Cdouble
-    rowranges::Dict{Int, UnitRange{Int}}
+    rows::Dict{Int, Int}
     setup_time::Cdouble
     silent::Bool
     info #TODO: specify type
@@ -75,11 +73,11 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         is_empty = true
         sense = MOI.MIN_SENSE
         objconstant = 0.0 
-        rowranges = Dict{Int, UnitRange{Int}}()
+        rows = Dict{Int, Int}()
         setup_time = 0.0
         silent=true
         optimizer = new(model,has_results,is_empty,sense,
-                        objconstant,rowranges,setup_time,silent,nothing)
+                        objconstant,rows,setup_time,silent,nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -100,7 +98,7 @@ function MOI.empty!(optimizer::Optimizer)
     optimizer.is_empty = true
     optimizer.sense = MOI.MIN_SENSE # model parameter, so needs to be reset
     optimizer.objconstant = 0.0 
-    optimizer.rowranges = Dict{Int, UnitRange{Int}}()
+    optimizer.rows = Dict{Int, Int}()
 end
 
 MOI.is_empty(optimizer::Optimizer) = optimizer.is_empty
@@ -196,13 +194,8 @@ function MOI.get(
 ) where {F, S <: MOI.AbstractSet}
 
     MOI.check_result_index_bounds(opt, a)
-    rows = constraint_rows(opt.rowranges, ci)
-
-    if(opt.sense != MOI.FEASIBILITY_SENSE)
-        λ=abs.(opt.info.λ[rows]) # λ for lower bounds ≥ 0 in MOI
-    else
-        λ = (length(rows)>1) ? zeros(Cdouble,length(rows)) : 0.0
-    end
+    row = opt.rows[ci.value]
+    λ= (opt.sense == MOI.FEASIBILITY_SENSE) ? 0.0 : abs(opt.info.λ[row]) # λ for lower bounds ≥ 0 in MOI
     return λ
 end
 
@@ -214,10 +207,10 @@ function MOI.get(
 ) where {F, S <: MOI.AbstractSet}
 
      MOI.check_result_index_bounds(opt, a)
-     rows = constraint_rows(opt.rowranges, ci)
+     row = opt.rows[ci.value]
      n = opt.model.qpj.n
-     Ax = (last(rows)<=n) ? opt.info.x[rows] : opt.model.qpj.A[:,rows.-n]'*opt.info.x
-     return min.(opt.model.qpj.bupper[rows]-Ax,Ax-opt.model.qpj.blower[rows])
+     Ax = (row <=n) ? opt.info.x[row] : opt.model.qpj.A[:,row-n]'*opt.info.x
+     return min.(opt.model.qpj.bupper[row]-Ax,Ax-opt.model.qpj.blower[row])
 end
 
 #Currently there is no internal printing in DAQP
@@ -238,11 +231,6 @@ MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = false
 
 ## Supported constraint types
 
-MOI.supports_constraint(
-    ::Optimizer,
-    ::Type{<:MOI.VectorAffineFunction},
-    ::Type{<:SupportedVectorSets}
-) = true
 MOI.supports_constraint(
     ::Optimizer,
     ::Type{<:MOI.ScalarAffineFunction},
@@ -274,7 +262,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     copy_to_check_attributes(dest,src)
 
     #assemble the constraints data
-    assign_constraint_row_ranges!(dest.rowranges, idxmap, src)
+    assign_constraint_rows!(dest.rows, idxmap, src)
     A, bupper, blower, sense = process_constraints(dest, src, idxmap)
 
     #assemble the objective data
@@ -348,8 +336,8 @@ function MOIU.IndexMap(dest::Optimizer, src::MOI.ModelLike)
 end
 
 
-function assign_constraint_row_ranges!(
-    rowranges::Dict{Int, UnitRange{Int}},
+function assign_constraint_rows!(
+    rows::Dict{Int, Int},
     idxmap::MOIU.IndexMap,
     src::MOI.ModelLike
 )
@@ -358,41 +346,19 @@ function assign_constraint_row_ranges!(
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         cis_src = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
         for ci_src in cis_src
-            set = MOI.get(src, MOI.ConstraintSet(), ci_src)
             ci_dest = idxmap[ci_src]
             if(F!=MOI.VariableIndex)
-                endrow = startrow + MOI.dimension(set) - 1
-                rowranges[ci_dest.value] = startrow : endrow
-                startrow = endrow + 1
+                rows[ci_dest.value] = startrow 
+                startrow += 1
             else
                 var_id = MOI.get(src, MOI.ConstraintFunction(), ci_src).value
-                rowranges[ci_dest.value] = var_id:var_id
+                rows[ci_dest.value] = var_id
             end
         end
     end
 
     return nothing
 end
-
-function constraint_rows(
-    rowranges::Dict{Int, UnitRange{Int}},
-    ci::MOI.ConstraintIndex{<:Any, <:MOI.AbstractScalarSet}
-)
-    rowrange = rowranges[ci.value]
-    length(rowrange) == 1 || error()
-    return first(rowrange)
-end
-
-constraint_rows(
-    rowranges::Dict{Int, UnitRange{Int}},
-    ci::MOI.ConstraintIndex{<:Any, <:MOI.AbstractVectorSet}
-) = rowranges[ci.value]
-
-constraint_rows(
-    optimizer::Optimizer,
-    ci::MOI.ConstraintIndex
-) = constraint_rows(optimizer.rowranges, ci)
-
 
 ## Extract Constraints
 #constraints: 
@@ -404,9 +370,9 @@ function process_constraints(
     idxmap
 )
 
-    rowranges = dest.rowranges
+    rows = dest.rows
     n = MOI.get(src, MOI.NumberOfVariables())
-    m = max(n,mapreduce(last, max, values(rowranges), init=0))
+    m = (isempty(rows)) ? n : maximum(values(rows))
 
     A = zeros(Cdouble,n,m-n)
     bupper = Vector{Cdouble}(undef, m)
@@ -422,7 +388,7 @@ function process_constraints(
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         process_constraints!(A, bupper, blower, sense, offset,
-                            src, idxmap, rowranges, 
+                            src, idxmap, rows, 
                             F, S)
     end
     bupper .-= offset 
@@ -440,7 +406,7 @@ function process_constraints!(
     offset::Vector{Cdouble},
     src::MOI.ModelLike,
     idxmap,
-    rowranges::Dict{Int,UnitRange{Int}},
+    rows::Dict{Int,Int},
     F::Type{<:MOI.AbstractFunction},
     S::Type{<:MOI.AbstractSet},
 )
@@ -449,10 +415,10 @@ function process_constraints!(
     for ci in cis_src
         s = MOI.get(src, MOI.ConstraintSet(), ci)
         f = MOI.get(src, MOI.ConstraintFunction(), ci)
-        rows = constraint_rows(rowranges, idxmap[ci])
-        extract_offset(offset, rows, f)
-        extract_A(A, f, rows.-n, idxmap)
-        extract_b(bupper, blower, sense, rows, f, s)
+        row = rows[idxmap[ci].value]
+        extract_offset(offset, row, f)
+        extract_A(A, f, row.-n, idxmap)
+        extract_b(bupper, blower, sense, row, f, s)
     end
     return
 end
@@ -465,41 +431,11 @@ function extract_offset(offset::Vector{Cdouble}, row::Int, f::Affine)
     return
 end
 
-function extract_offset(
-    offset::Vector{Cdouble},
-    rows::UnitRange{Int},
-    f::VectorAffine,
-)
-    for (i, row) in enumerate(rows)
-        offset[row] = f.constants[i]
-    end
-end
-
-
-function extract_A(
-    A::Matrix{Cdouble},
-    f::Affine,
-    row::Int,
-    idxmap,
-)
+function extract_A(A::Matrix{Cdouble}, f::Affine, row::Int, idxmap)
     for term in f.terms
         var = term.variable
         col = idxmap[var].value
         A[col,row] = term.coefficient # colmaj -> rowmaj
-    end
-end
-
-function extract_A(
-    A::Matrix{Cdouble},
-    f::VectorAffine,
-    rows::UnitRange{Int},
-    idxmap,
-)
-    for term in f.terms
-        row = rows[term.output_index]
-        var = term.scalar_term.variable
-        col = idxmap[var].value
-        A[col,row] = term.scalar_term.coefficient # colmaj -> rowmaj
     end
 end
 
@@ -514,6 +450,7 @@ function extract_b(
     extract_b(bupper,blower,sense, row, MOI.Interval(s))
     return
 end
+
 function extract_b(
     bu::Vector{Cdouble},
     bl::Vector{Cdouble},
@@ -535,34 +472,11 @@ function extract_b(
     row::Int,
     interval::Interval,
 )
-    bupper[row] = interval.upper #TODO: add min/max for simple...
+    bupper[row] = interval.upper
     blower[row] = interval.lower
     sense[row] = (interval.lower == interval.upper) ?  DAQP.EQUALITY : 0
     return
 end
-
-lower(::MOI.Zeros, ::Int) = 0.0
-lower(::MOI.Nonnegatives, ::Int) = 0.0
-lower(::MOI.Nonpositives, ::Int) = -Inf
-upper(::MOI.Zeros, ::Int) = 0.0
-upper(::MOI.Nonnegatives, ::Int) = Inf
-upper(::MOI.Nonpositives, ::Int) = 0.0
-
-function extract_b(
-    bu::Vector{Cdouble},
-    bl::Vector{Cdouble},
-    sense::Vector{Cint},
-    rows::UnitRange{Int},
-    f,
-    s::S,
-) where {S<:SupportedVectorSets}
-    for (i, row) in enumerate(rows)
-        bu[row] = upper(s, i)
-        bl[row] = lower(s, i)
-        sense[row] = (bu[row]== bl[row]) ? DAQP.ACTIVE+DAQP.IMMUTABLE : 0
-    end
-end
-
 
 ## Extract Objective
 # Construct the objective minimize `0.5 x' H x + f' x + c
