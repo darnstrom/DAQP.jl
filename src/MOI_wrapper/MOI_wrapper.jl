@@ -65,6 +65,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     rows::Dict{Int, Int}
     setup_time::Cdouble
     silent::Bool
+    settings::DAQPSettings
     info #TODO: specify type
 
     function Optimizer(; user_settings...)
@@ -77,7 +78,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         setup_time = 0.0
         silent=true
         optimizer = new(model,has_results,is_empty,sense,
-                        objconstant,rows,setup_time,silent,nothing)
+                        objconstant,rows,setup_time,silent,settings(model),nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -90,9 +91,9 @@ end
 # reset the optimizer
 function MOI.empty!(optimizer::Optimizer)
     #just make a new model, keeping current settings
-    tmp_settings = settings(optimizer.model)
+    optimizer.settings = settings(optimizer.model)
     optimizer.model = DAQP.Model()
-    isnothing(tmp_settings) || settings(optimizer.model,tmp_settings)
+    isnothing(optimizer.settings) || settings(optimizer.model,optimizer.settings)
 
     optimizer.has_results = false
     optimizer.is_empty = true
@@ -107,6 +108,7 @@ function MOI.optimize!(optimizer::Optimizer)
     if(!optimizer.is_empty)
         ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
         optimizer.has_results = true
+        settings(optimizer.model,optimizer.settings) # restore settings 
     end
     return
 end
@@ -269,10 +271,25 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
-    # setup solver
+    # Setup solver
+    dest.settings = settings(dest.model) # Cache settings in prox is changed
+
+    # Check if LP
+    if(isempty(H) && !isempty(f))
+        @warn "The objective is not strictly convex, updating settings with eps_prox=1"
+        settings(dest.model,Dict(:eps_prox=>1))
+    end
+
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
-	@assert(exitflag>=0, "DAQP failed when setting up the problem\nDAQP mainly supports strictly convex objectives. \nIf your objective is convex and there are no binary variables, try setting eps_prox > 0.")
-	dest.is_empty = false
+    if(exitflag < 0)
+        # Not strictly convex -> try proximal-point iterations
+        eps_prox = 1e-7 # 
+        @warn "The objective is not strictly convex, updating settings with eps_prox=$eps_prox"
+        settings(dest.model,Dict(:eps_prox=>eps_prox))
+        exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+        @assert(exitflag>=0, "DAQP failed when setting up the problem\nDAQP only supports convex objectives.")
+    end
+    dest.is_empty = false
     return idxmap
 end
 
