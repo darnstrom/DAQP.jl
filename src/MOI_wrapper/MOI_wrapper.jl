@@ -510,8 +510,8 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
     n = MOI.get(src, MOI.NumberOfVariables())
 
     if sense == MOI.FEASIBILITY_SENSE
-        H = Matrix{Cdouble}(I(n))# TODO: use nothing instead 
-        f = zeros(n); 
+        H = zeros(0,0)
+        f = zeros(0)
         c = 0.0
     else
         function_type = MOI.get(src, MOI.ObjectiveFunctionType())
@@ -519,7 +519,7 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
 
         if function_type == Affine  #TODO: DAQP supports pure LPs, but still experimental
             faffine = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction}())
-            H = nothing 
+            H = zeros(0,0)
             process_objective_linearterm!(f, faffine.terms, idxmap)
             c = faffine.constant
 
