@@ -195,7 +195,7 @@ function MOI.get(
 
     MOI.check_result_index_bounds(opt, a)
     row = opt.rows[ci.value]
-    λ= (opt.sense == MOI.FEASIBILITY_SENSE) ? 0.0 : abs(opt.info.λ[row]) # λ for lower bounds ≥ 0 in MOI
+    λ= (opt.sense == MOI.FEASIBILITY_SENSE) ? 0.0 : -opt.info.λ[row] #MOI use opposite sign convetion
     return λ
 end
 
