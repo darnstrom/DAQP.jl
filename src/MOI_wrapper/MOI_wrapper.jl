@@ -189,30 +189,37 @@ function MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::MOI.VariableIndex)
 end
 
 MOI.supports(::Optimizer, ::MOI.ConstraintDual) = true
-function MOI.get(
-    opt::Optimizer,
-      a::MOI.ConstraintDual,
-     ci::MOI.ConstraintIndex{F, S}
-) where {F, S <: MOI.AbstractSet}
-
+function MOI.get(opt::Optimizer, a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{Affine, <:Any}
+    ) 
     MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
     row = opt.rows[ci.value]
-    λ= (opt.sense == MOI.FEASIBILITY_SENSE) ? 0.0 : -opt.info.λ[row] #MOI use opposite sign convetion
-    return λ
+    return -opt.info.λ[row]
 end
-
-MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = true
-function MOI.get(
-    opt::Optimizer,
-      a::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{F, S}
-) where {F, S <: MOI.AbstractSet}
-
-     MOI.check_result_index_bounds(opt, a)
-     row = opt.rows[ci.value]
-     n = opt.model.qpj.n
-     Ax = (row <=n) ? opt.info.x[row] : opt.model.qpj.A[:,row-n]'*opt.info.x
-     return min.(opt.model.qpj.bupper[row]-Ax,Ax-opt.model.qpj.blower[row])
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, GreaterThan}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return max(-opt.info.λ[row],0) # seperate constraints can be interval in DAQP
+end
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, LessThan}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return min(-opt.info.λ[row],0) # seperate constraints can be interval in DAQP
+end
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, <:Union{EqualTo,Interval,MOI.ZeroOne}}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return -opt.info.λ[row]
 end
 
 #Currently there is no internal printing in DAQP
