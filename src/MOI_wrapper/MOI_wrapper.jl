@@ -375,7 +375,7 @@ function assign_constraint_rows!(
                 rows[ci_dest.value] = startrow 
                 startrow += 1
             else
-                var_id = MOI.get(src, MOI.ConstraintFunction(), ci_src).value
+                var_id = idxmap[MOI.get(src, MOI.ConstraintFunction(), ci_src)].value
                 rows[ci_dest.value] = var_id
             end
         end
