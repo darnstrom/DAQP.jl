@@ -104,9 +104,12 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   unsafe_store!(daqp.qpc_ptr,daqp.qpc)
   setup_time = Cdouble(0);
 
-  # ensure proximal-point iterations are used for LPs
-  if(isempty(qp.H) && !isempty(qp.f) && old_settings.eps_prox == 0)
-      settings(daqp,Dict(:eps_prox=>1))
+  if(isempty(qp.H) && !isempty(qp.f))# LP
+      # ensure their is no binary constraint
+      @assert(!any((qp.sense.&BINARY).==BINARY),
+              "DAQP requires the objective to be strictly convex to support binary variables")
+      # ensure proximal-point iterations are used for LPs
+      (old_settings.eps_prox == 0) && settings(daqp,Dict(:eps_prox=>1))
   end
 
   exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ptr{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))

@@ -54,8 +54,9 @@ function test_runtests()
     MOI.Test.runtests(
         BRIDGED,
         CONFIG,
-        exclude = [
-            "test_constraint_ZeroOne_", # Bin only supported for strictly convex objective 
+        exclude = [ # Bin only supported for strictly convex objective
+            "test_constraint_ZeroOne_",
+            "test_variable_solve_ZeroOne_",
         ],
         exclude_tests_after = v"0.10.5",
     )

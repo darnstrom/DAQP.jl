@@ -285,6 +285,9 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
 
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
     if(exitflag < 0)
+        # Ensure their is no binary constraint
+        @assert(!any((sense.&BINARY).==BINARY),
+                "DAQP requires the objective to be strictly convex to support binary variables")
         # Not strictly convex -> try proximal-point iterations
         eps_prox = 1e-7 # 
         @warn "The objective is not strictly convex, updating settings with eps_prox=$eps_prox"
