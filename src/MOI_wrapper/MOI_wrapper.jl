@@ -131,7 +131,7 @@ function Base.show(io::IO, optimizer::Optimizer)
             println(io, " : Optimal objective: $(value)")
             println(io, " : Iterations: $(MOI.get(optimizer,MOI.SimplexIterations()))")
             println(io, " : Nodes: $(MOI.get(optimizer,MOI.NodeCount()))")
-            solvetime = round.(optimizer.model.info.solve_time*1000,digits=2)
+            solvetime = round.(optimizer.info.solve_time*1000,digits=2)
             println(io, " : Solve time: $(solvetime)ms")
         end
     end
