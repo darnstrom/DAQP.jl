@@ -233,6 +233,8 @@ MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute) =
 MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
     settings(opt.model, Dict(Symbol(param.name)=>value))
 
+MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
+    (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
