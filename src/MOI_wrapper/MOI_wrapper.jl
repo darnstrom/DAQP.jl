@@ -281,13 +281,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
     # Setup solver
-    dest.settings = settings(dest.model) # Cache settings in prox is changed
-
-    # Check if LP
-    if(isempty(H) && !isempty(f))
-        @warn "The objective is not strictly convex, updating settings with eps_prox=1"
-        settings(dest.model,Dict(:eps_prox=>1))
-    end
+    dest.settings = settings(dest.model) # Cache settings in case eps_prox is changed
 
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
     if(exitflag < 0)

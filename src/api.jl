@@ -103,6 +103,12 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   old_settings = settings(daqp); # in case setup fails
   unsafe_store!(daqp.qpc_ptr,daqp.qpc)
   setup_time = Cdouble(0);
+
+  # ensure proximal-point iterations are used for LPs
+  if(isempty(qp.H) && !isempty(qp.f) && old_settings.eps_prox == 0)
+      settings(daqp,Dict(:eps_prox=>1))
+  end
+
   exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ptr{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
   if(exitflag < 0)
 	# XXX: if setup fails DAQP currently clears settings
