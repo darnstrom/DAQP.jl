@@ -259,7 +259,7 @@ MOI.supports_constraint(
 MOI.supports(
     ::Optimizer,
     ::MOI.ObjectiveFunction{<:Union{
-       #MOI.ScalarAffineFunction,
+       MOI.ScalarAffineFunction,
        MOI.ScalarQuadraticFunction,
     }}
 ) = true

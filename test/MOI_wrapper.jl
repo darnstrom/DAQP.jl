@@ -55,7 +55,7 @@ function test_runtests()
         BRIDGED,
         CONFIG,
         exclude = [
-            "test_objective_qp_ObjectiveFunction_edge_cases", #requires support for singular H 
+            "test_constraint_ZeroOne_", # Bin only supported for strictly convex objective 
         ],
         exclude_tests_after = v"0.10.5",
     )
