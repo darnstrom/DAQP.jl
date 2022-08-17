@@ -280,6 +280,13 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
+    println(A)
+    println(bupper)
+    println(blower)
+    println(sense)
+    println(H)
+    println(f)
+
     # Setup solver
     dest.settings = settings(dest.model) # Cache settings in case eps_prox is changed
 
