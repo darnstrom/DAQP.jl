@@ -65,6 +65,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     rows::Dict{Int, Int}
     setup_time::Cdouble
     silent::Bool
+    settings::DAQPSettings
     info #TODO: specify type
 
     function Optimizer(; user_settings...)
@@ -77,7 +78,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         setup_time = 0.0
         silent=true
         optimizer = new(model,has_results,is_empty,sense,
-                        objconstant,rows,setup_time,silent,nothing)
+                        objconstant,rows,setup_time,silent,settings(model),nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -90,9 +91,9 @@ end
 # reset the optimizer
 function MOI.empty!(optimizer::Optimizer)
     #just make a new model, keeping current settings
-    tmp_settings = settings(optimizer.model)
+    optimizer.settings = settings(optimizer.model)
     optimizer.model = DAQP.Model()
-    isnothing(tmp_settings) || settings(optimizer.model,tmp_settings)
+    isnothing(optimizer.settings) || settings(optimizer.model,optimizer.settings)
 
     optimizer.has_results = false
     optimizer.is_empty = true
@@ -107,6 +108,7 @@ function MOI.optimize!(optimizer::Optimizer)
     if(!optimizer.is_empty)
         ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
         optimizer.has_results = true
+        settings(optimizer.model,optimizer.settings) # restore settings 
     end
     return
 end
@@ -129,7 +131,7 @@ function Base.show(io::IO, optimizer::Optimizer)
             println(io, " : Optimal objective: $(value)")
             println(io, " : Iterations: $(MOI.get(optimizer,MOI.SimplexIterations()))")
             println(io, " : Nodes: $(MOI.get(optimizer,MOI.NodeCount()))")
-            solvetime = round.(optimizer.model.info.solve_time*1000,digits=2)
+            solvetime = round.(optimizer.info.solve_time*1000,digits=2)
             println(io, " : Solve time: $(solvetime)ms")
         end
     end
@@ -186,31 +188,51 @@ function MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::MOI.VariableIndex)
     return opt.info.x[vi.value]
 end
 
-MOI.supports(::Optimizer, ::MOI.ConstraintDual) = true
+MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = true
 function MOI.get(
-    opt::Optimizer,
-      a::MOI.ConstraintDual,
-     ci::MOI.ConstraintIndex{F, S}
-) where {F, S <: MOI.AbstractSet}
+        opt::Optimizer,
+        a::MOI.ConstraintPrimal,
+        ci::MOI.ConstraintIndex{F, S}
+    ) where {F, S <: MOI.AbstractSet}
 
     MOI.check_result_index_bounds(opt, a)
     row = opt.rows[ci.value]
-    λ= (opt.sense == MOI.FEASIBILITY_SENSE) ? 0.0 : abs(opt.info.λ[row]) # λ for lower bounds ≥ 0 in MOI
-    return λ
+    n = opt.model.qpj.n
+    return (row <=n) ? opt.info.x[row] : opt.model.qpj.A[:,row-n]'*opt.info.x
 end
 
-MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = true
-function MOI.get(
-    opt::Optimizer,
-      a::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{F, S}
-) where {F, S <: MOI.AbstractSet}
-
-     MOI.check_result_index_bounds(opt, a)
-     row = opt.rows[ci.value]
-     n = opt.model.qpj.n
-     Ax = (row <=n) ? opt.info.x[row] : opt.model.qpj.A[:,row-n]'*opt.info.x
-     return min.(opt.model.qpj.bupper[row]-Ax,Ax-opt.model.qpj.blower[row])
+MOI.supports(::Optimizer, ::MOI.ConstraintDual) = true
+function MOI.get(opt::Optimizer, a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{Affine, <:Any}
+    ) 
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return -opt.info.λ[row]
+end
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, GreaterThan}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return max(-opt.info.λ[row],0) # seperate constraints can be interval in DAQP
+end
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, LessThan}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return min(-opt.info.λ[row],0) # seperate constraints can be interval in DAQP
+end
+function MOI.get(opt::Optimizer,a::MOI.ConstraintDual,
+        ci::MOI.ConstraintIndex{MOI.VariableIndex, <:Union{EqualTo,Interval,MOI.ZeroOne}}
+    )
+    MOI.check_result_index_bounds(opt, a)
+    (opt.sense == MOI.FEASIBILITY_SENSE) && return 0.0
+    row = opt.rows[ci.value]
+    return -opt.info.λ[row]
 end
 
 #Currently there is no internal printing in DAQP
@@ -224,6 +246,8 @@ MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute) =
 MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
     settings(opt.model, Dict(Symbol(param.name)=>value))
 
+MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
+    (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
@@ -248,7 +272,7 @@ MOI.supports_constraint(
 MOI.supports(
     ::Optimizer,
     ::MOI.ObjectiveFunction{<:Union{
-       #MOI.ScalarAffineFunction,
+       MOI.ScalarAffineFunction,
        MOI.ScalarQuadraticFunction,
     }}
 ) = true
@@ -269,10 +293,22 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
-    # setup solver
+    # Setup solver
+    dest.settings = settings(dest.model) # Cache settings in case eps_prox is changed
+
     exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
-	@assert(exitflag>=0, "DAQP failed when setting up the problem\nDAQP mainly supports strictly convex objectives. \nIf your objective is convex and there are no binary variables, try setting eps_prox > 0.")
-	dest.is_empty = false
+    if(exitflag < 0)
+        # Ensure their is no binary constraint
+        @assert(!any((sense.&BINARY).==BINARY),
+                "DAQP requires the objective to be strictly convex to support binary variables")
+        # Not strictly convex -> try proximal-point iterations
+        eps_prox = 1e-7 # 
+        @warn "The objective is not strictly convex, updating settings with eps_prox=$eps_prox"
+        settings(dest.model,Dict(:eps_prox=>eps_prox))
+        exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+        @assert(exitflag>=0, "DAQP failed when setting up the problem\nDAQP only supports convex objectives.")
+    end
+    dest.is_empty = false
     return idxmap
 end
 
@@ -351,7 +387,7 @@ function assign_constraint_rows!(
                 rows[ci_dest.value] = startrow 
                 startrow += 1
             else
-                var_id = MOI.get(src, MOI.ConstraintFunction(), ci_src).value
+                var_id = idxmap[MOI.get(src, MOI.ConstraintFunction(), ci_src)].value
                 rows[ci_dest.value] = var_id
             end
         end
@@ -486,8 +522,8 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
     n = MOI.get(src, MOI.NumberOfVariables())
 
     if sense == MOI.FEASIBILITY_SENSE
-        H = Matrix{Cdouble}(I(n))# TODO: use nothing instead 
-        f = zeros(n); 
+        H = zeros(0,0)
+        f = zeros(0)
         c = 0.0
     else
         function_type = MOI.get(src, MOI.ObjectiveFunctionType())
@@ -495,7 +531,7 @@ function process_objective(dest::Optimizer, src::MOI.ModelLike, idxmap)
 
         if function_type == Affine  #TODO: DAQP supports pure LPs, but still experimental
             faffine = MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction}())
-            H = nothing 
+            H = zeros(0,0)
             process_objective_linearterm!(f, faffine.terms, idxmap)
             c = faffine.constant
 

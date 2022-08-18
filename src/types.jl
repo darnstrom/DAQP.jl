@@ -47,9 +47,12 @@ struct QPc
   nb::Cint
 end
 function QPc(qpj::QPj)
+  H_ptr = isempty(qpj.H) ? C_NULL : pointer(qpj.H)
+  f_ptr = isempty(qpj.f) ? C_NULL : pointer(qpj.f)
   return QPc(qpj.n,qpj.m,qpj.ms,
-			 pointer(qpj.H),pointer(qpj.f),
-             pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense),pointer(qpj.bin_ids),qpj.nb)
+			 H_ptr,f_ptr,
+             pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense)
+			 ,pointer(qpj.bin_ids),qpj.nb)
 end
 
 struct DAQPSettings

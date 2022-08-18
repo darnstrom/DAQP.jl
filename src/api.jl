@@ -88,7 +88,6 @@ end
 
 function delete!(daqp::DAQP.Model)
   if(daqp.work != C_NULL)
-      workspace = unsafe_load(daqp.work);
       ccall((:free_daqp_workspace,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
       Libc.free(daqp.work);
       daqp.work = C_NULL
@@ -103,6 +102,15 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   old_settings = settings(daqp); # in case setup fails
   unsafe_store!(daqp.qpc_ptr,daqp.qpc)
   setup_time = Cdouble(0);
+
+  if(isempty(qp.H) && !isempty(qp.f))# LP
+      # ensure their is no binary constraint
+      @assert(!any((qp.sense.&BINARY).==BINARY),
+              "DAQP requires the objective to be strictly convex to support binary variables")
+      # ensure proximal-point iterations are used for LPs
+      (old_settings.eps_prox == 0) && settings(daqp,Dict(:eps_prox=>1))
+  end
+
   exitflag = ccall((:setup_daqp,DAQP.libdaqp),Cint,(Ptr{DAQP.QPc}, Ptr{DAQP.Workspace}, Ptr{Cdouble}), daqp.qpc_ptr, daqp.work, Ref{Cdouble}(setup_time))
   if(exitflag < 0)
 	# XXX: if setup fails DAQP currently clears settings
@@ -110,6 +118,14 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
 	settings(daqp,old_settings)
   else
 	daqp.has_model = true
+    # Quick fix to initialize x for proximal
+    # will be fixed in DAQP_jll 0.3.2
+    if((isempty(qp.H)&&!isempty(qp.f)) || old_settings.eps_prox != 0)
+        workspace = unsafe_load(daqp.work);
+        xinit = zeros(workspace.n)
+        unsafe_copyto!(workspace.x,pointer(xinit),workspace.n);
+    end
+    # should be unsafe_copy_to
   end
   return exitflag, setup_time
 end
