@@ -188,6 +188,19 @@ function MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::MOI.VariableIndex)
     return opt.info.x[vi.value]
 end
 
+MOI.supports(::Optimizer, ::MOI.ConstraintPrimal) = true
+function MOI.get(
+        opt::Optimizer,
+        a::MOI.ConstraintPrimal,
+        ci::MOI.ConstraintIndex{F, S}
+    ) where {F, S <: MOI.AbstractSet}
+
+    MOI.check_result_index_bounds(opt, a)
+    row = opt.rows[ci.value]
+    n = opt.model.qpj.n
+    return (row <=n) ? opt.info.x[row] : opt.model.qpj.A[:,row-n]'*opt.info.x
+end
+
 MOI.supports(::Optimizer, ::MOI.ConstraintDual) = true
 function MOI.get(opt::Optimizer, a::MOI.ConstraintDual,
         ci::MOI.ConstraintIndex{Affine, <:Any}
