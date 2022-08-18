@@ -109,6 +109,7 @@ function MOI.optimize!(optimizer::Optimizer)
         ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
         optimizer.has_results = true
         settings(optimizer.model,optimizer.settings) # restore settings 
+        (optimizer.silent) || show(optimizer)
     end
     return
 end
@@ -279,13 +280,6 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     #assemble the objective data
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
-
-    println(A)
-    println(bupper)
-    println(blower)
-    println(sense)
-    println(H)
-    println(f)
 
     # Setup solver
     dest.settings = settings(dest.model) # Cache settings in case eps_prox is changed
