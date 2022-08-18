@@ -109,7 +109,6 @@ function MOI.optimize!(optimizer::Optimizer)
         ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
         optimizer.has_results = true
         settings(optimizer.model,optimizer.settings) # restore settings 
-        (optimizer.silent) || show(optimizer)
     end
     return
 end
