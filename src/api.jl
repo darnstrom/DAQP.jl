@@ -213,7 +213,7 @@ end
 
 function setup_c_workspace(n)::Ptr{Cvoid}
   p = Libc.calloc(1,sizeof(DAQP.Workspace)); 
-  ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint),p, n);
+  ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint,Cint),p, n, 0);
   ccall((:allocate_daqp_settings,libdaqp), Cvoid, (Ptr{Cvoid},),p);
   return p
 end
