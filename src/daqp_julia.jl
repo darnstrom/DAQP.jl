@@ -1,16 +1,16 @@
 using LinearAlgebra 
 
-function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings())
+function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64)
   # Initial AS is union AS0 and equality constraints  
   AS = findall((senses.&IMMUTABLE).!=0); # Maybe this could be done better (i.e., input the indices..)
   AS = AS ∪ AS0;
   IS = setdiff(1:length(d),AS);
   lambda=ones(length(AS));
-  L = zeros(0,0);
-  D = zeros(0);
+  L = zeros(precision,0,0);
+  D = zeros(precision,0);
   for (k,ind) in enumerate(AS) # Setup LDL' for AS
 	m = M[ind,:];
-	L,D=updateLDLadd(L,D,M[AS[1:k-1],:]*m,m'*m);
+	L,D=updateLDLadd(L,D,M[AS[1:k-1],:]*m,m'*m;precision);
   end
 
   iter = 1;
@@ -91,7 +91,7 @@ function remove_constraint(lambda,AS,IS,L,D,p,block_inds)
 end
 
 
-function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings())
+function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),precision=Float64)
   R = cholesky((H+H')/2);
   M = A/R.U;
   v = (R.L)\f;
@@ -104,7 +104,10 @@ function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings())
 	d[i,:]./=norm_factor;
   end
 
-  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings)
+  if(eltype(M)!=precision)
+      precision.(M)
+  end
+  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings,precision)
   # Form solution to nomial problem
   if(!isempty(u))
 	x_opt=R.U\(-u-v);
@@ -147,25 +150,26 @@ function backward_L(L,b)
   return x
 end
 
-function updateLDLadd(L,D,b,bet;precision=Float64)
+function updateLDLadd(L,D,b,bet;zero_tol=1e-9)
   # Return Lup, Dup
   # compute Lup Dup s.t. Lup Dup Lup' = [A;a'] [A;a']'
   # when A A' = LDL'
   #b = A*a, bet = a'*a
+  precision = eltype(L);
   if(isempty(D))
-	return ones(1,1),[D;bet] 
+	return ones(precision,1,1),[D;bet] 
   end
   k = size(L,1);
   #c = L\b; # Implement own backwards solve?
   c = forward_L(L,b); # Implement own backwards solve?
   l = zeros(precision,k);
   for i = 1:k
-	if(D[i]>1e-9)
+	if(D[i]>zero_tol)
 	  l[i] = c[i]/D[i];
 	end
   end
   d = bet-(l.*D)'*l;
-  if(d<1e-9)
+  if(d<zero_tol)
 	d = 0;
   end
   Lup = [L zeros(precision,k,1);l' 1];
@@ -187,15 +191,16 @@ function updateLDLremove(L,D,i)
   D2 = D[i+1:k];
   
   L2_tilde,D2_tilde =rankone_add_LDL(L2,D2,l,d);
-  Lup = [L1 zeros(i-1,k-i);L3 L2_tilde];
+  Lup = [L1 zeros(eltype(L),i-1,k-i);L3 L2_tilde];
   Dup = [D1;D2_tilde];
   return Lup, Dup
 end
 
-function rankone_add_LDL(L,D,l,delta;precision=Float64)
+function rankone_add_LDL(L,D,l,delta)
   # Out put Lup, Dup
   # Algorithm C1 Methods for modidfying matrix factorizations - Gill et al 1974
   # Compute Lup Dup such that Lup Dup Lup' = LDL'+delta*l l'
+  precision = eltype(L);
   n = length(l);
   Dup = zeros(precision,n) ;
   Lup = Matrix{precision}(I, n, n);
@@ -215,7 +220,8 @@ function rankone_add_LDL(L,D,l,delta;precision=Float64)
   return Lup,Dup
 end
 
-function compute_singulardirection(L,D,i;precision=Float64)
+function compute_singulardirection(L,D,i)
+    precision = eltype(L);
   k = length(D);p = zeros(precision,k);
   L1 = L[1:i-1,1:i-1]; l = L[i,1:i-1];
   p[1:i-1] = -backward_L(L1,l);
