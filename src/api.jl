@@ -211,6 +211,12 @@ function update(daqp::DAQP.Model, H,f,A,bupper,blower,sense)
   exitflag = ccall((:update_ldp,DAQP.libdaqp),Cint,(Cint,Ptr{DAQP.Workspace},), update_mask, daqp.work);
 end
 
+function codegen(daqp::DAQP.Model;filename="daqp_workspace",dir="")
+    @assert(daqp.has_model, "setup the model before code generation")
+    exitflag = ccall((:render_daqp_workspace,DAQP.libdaqp),Cvoid,
+                     (Ptr{DAQP.Workspace},Cstring,Cstring,), daqp.work,filename,dir);
+end
+
 function setup_c_workspace(n)::Ptr{Cvoid}
   p = Libc.calloc(1,sizeof(DAQP.Workspace)); 
   ccall((:allocate_daqp_workspace,libdaqp), Cvoid, (Ptr{Cvoid},Cint,Cint),p, n, 0);
