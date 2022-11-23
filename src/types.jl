@@ -70,6 +70,9 @@ struct DAQPSettings
   eta_prox::Cdouble
 
   rho_soft::Cdouble
+
+  rel_subopt::Cdouble
+  abs_subopt::Cdouble
 end
 function DAQPSettings()
   settings = Ref{DAQP.DAQPSettings}()

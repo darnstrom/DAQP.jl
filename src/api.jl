@@ -20,6 +20,7 @@ where `m = length(bupper)` and `ms = m-size(A,2)`.
 * `sense` 		- constraint types,  `m`-vector of Cints. Example types:
   * `0` : inequality
   * `5` : equality
+  * `16` : binary
 
 # Output
 * `xstar` 		- solution provided by solver
