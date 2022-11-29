@@ -10,7 +10,7 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64)
   D = zeros(precision,0);
   for (k,ind) in enumerate(AS) # Setup LDL' for AS
 	m = M[ind,:];
-	L,D=updateLDLadd(L,D,M[AS[1:k-1],:]*m,m'*m;precision);
+	L,D=updateLDLadd(L,D,M[AS[1:k-1],:]*m,m'*m);
   end
 
   iter = 1;
