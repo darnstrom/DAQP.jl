@@ -1,6 +1,6 @@
 using LinearAlgebra 
 
-function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64)
+function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64, pivoting=false)
   # Initial AS is union AS0 and equality constraints  
   AS = findall((senses.&IMMUTABLE).!=0); # Maybe this could be done better (i.e., input the indices..)
   AS = AS ∪ AS0;
@@ -51,6 +51,8 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64)
 		p = lambda_star-lambda;
 		block_inds = inequality_mask[AS] .& (lambda_star.<0)
 		lambda,AS,IS,L,D = remove_constraint(lambda,AS,IS,L,D,p,block_inds);
+        # pivot to improve numerics
+        pivoting && pivot_last!(AS,L,D,lambda,M);
 	  end
 	else #Singular 
 	  p = compute_singulardirection(L,D,singular_ind);
@@ -59,6 +61,7 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),precision=Float64)
 		return zeros(0),zeros(0),AS,Inf,iter,ASs;
 	  end
 	  lambda,AS,IS,L,D = remove_constraint(lambda,AS,IS,L,D,p,block_inds);
+      pivoting && pivot_last!(AS,L,D,lambda,M);
 	end
 	if(!fin)
 	  iter = iter + 1;
@@ -91,7 +94,7 @@ function remove_constraint(lambda,AS,IS,L,D,p,block_inds)
 end
 
 
-function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),precision=Float64)
+function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),precision=Float64, pivoting=false)
   R = cholesky((H+H')/2);
   M = A/R.U;
   v = (R.L)\f;
@@ -107,7 +110,7 @@ function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),precision=Float64)
   if(eltype(M)!=precision)
       precision.(M)
   end
-  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings,precision)
+  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings,precision,pivoting)
   # Form solution to nomial problem
   if(!isempty(u))
 	x_opt=R.U\(-u-v);
@@ -227,4 +230,25 @@ function compute_singulardirection(L,D,i)
   p[1:i-1] = -backward_L(L1,l);
   p[i]= 1;
   return p
+end
+
+function pivot_last!(AS,L,D,lam,M; pivot_tol = 1e-4)
+    n_active = length(AS)
+    rm_ind = n_active-1;
+    if(n_active > 1 && D[rm_ind] < pivot_tol && D[rm_ind] < D[end])
+        # Store
+        ind_old = AS[rm_ind]
+        lam_old = lam[rm_ind]
+        # Remove
+        AS = AS[1:end .!= rm_ind]
+        lam = lam[1:end .!= rm_ind]
+        L,D = updateLDLremove(L,D,rm_ind)
+        # Recursively check pivoting
+        pivot_last!(AS,L,D,lam,M)
+        # Add
+        m = M[ind_old,:];
+        L,D = updateLDLadd(L,D,M[AS,:]*m,m'*m);
+        push!(AS,ind_old)
+        push!(lam, lam_old)
+    end
 end
