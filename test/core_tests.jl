@@ -37,6 +37,11 @@ end
 								 A=[1.0 0;0 1], b=[1;1],
 								 senses=zeros(Cint,2)),Int64[]);
   @test isempty(AS)
+  # Test with pivoting  TODO: add informative example
+  xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
+  x,lam,AS,J,iter= DAQP.daqp_jl(H,f,[A;-A],[bupper;-blower],[sense;sense],Int64[]; pivoting=true);
+  @test norm(xref-x) < tol;
+
 end
 
 @testset "BnB" begin
