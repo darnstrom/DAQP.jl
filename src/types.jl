@@ -23,6 +23,8 @@ function QPj(H::Matrix{Float64},f::Vector{Float64},
   else
       (mA,n) = size(A);
   end
+  blower = isempty(blower) ? fill(-1e30,length(bupper)) : blower
+  sense = isempty(sense) ? zeros(Cint,length(bupper)) : sense
   m = length(bupper);
   ms = m-mA;
   bin_ids = findall(sense.&BINARY .!=0).-1;

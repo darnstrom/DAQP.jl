@@ -1,7 +1,8 @@
 """
+	xstar, fval, exitflag, info = DAQP.quadprog(H,f,A,bupper)
 	xstar, fval, exitflag, info = DAQP.quadprog(H,f,A,bupper,blower,sense) 
 
-finds the solution `xstar` to the quadratic programming problem
+finds the solution `xstar` to the quadratic program
 
 ```
 min_x	0.5 x' H x + f' x
@@ -16,8 +17,8 @@ where `m = length(bupper)` and `ms = m-size(A,2)`.
 * `f`  			- linear term in objective function, n-vector 
 * `A`  			- constraint normals, (`(m-ms) x n`)-matrix
 * `bupper` 		- upper bounds for constraints, `m`-vector
-* `blower` 		- lower bounds for constraints, `m`-vector
-* `sense` 		- constraint types,  `m`-vector of Cints. Example types:
+* `blower` 		- lower bounds for constraints, `m`-vector (default: -Inf)
+* `sense` 		- constraint types,  `m`-vector of Cints (default: 0). Example types:
   * `0` : inequality
   * `5` : equality
   * `16` : binary
@@ -30,8 +31,8 @@ where `m = length(bupper)` and `ms = m-size(A,2)`.
 
 """
 function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
-	A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64},sense::Vector{Cint})
-  return quadprog(QPj(H,f,A,bupper,blower,sense))
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false)
+  return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj))
 end
 function quadprog(qpj::QPj)
   # TODO: check validity of dimensions
@@ -56,6 +57,42 @@ function quadprog(qpj::QPj)
   return xstar,result[].fval,result[].exitflag,info
 end
 
+"""
+	xstar, fval, exitflag, info = DAQP.linprog(f,A,bupper)
+	xstar, fval, exitflag, info = DAQP.linprog(f,A,bupper,blower,sense)
+
+finds the solution `xstar` to the linear program
+
+```
+min_x	f' x
+subject to 
+	blower[1:ms]	<= x[1:ms] <= bupper[1:ms]
+	blower[ms+1:m]  <= A*x 	   <= bupper[ms+1:m],
+```
+where `m = length(bupper)` and `ms = m-size(A,2)`.
+
+# Input 
+* `f`  			- linear term in objective function, n-vector 
+* `A`  			- constraint normals, (`(m-ms) x n`)-matrix
+* `bupper` 		- upper bounds for constraints, `m`-vector
+* `blower` 		- lower bounds for constraints, `m`-vector (default: -Inf)
+* `sense` 		- constraint types,  `m`-vector of Cints (default: 0). Example types:
+  * `0` : inequality
+  * `5` : equality
+
+# Output
+* `xstar` 		- solution provided by solver
+* `fval` 		- objective function value for `xstar`. 
+* `exitflag` 	- flag from solver (>0 success, <0 failure) 
+* `info` 		- tuple containing profiling information from the solver. 
+
+"""
+function linprog(f::Vector{Float64}, 
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false)
+	d = DAQP.Model() 
+    DAQP.setup(d,QPj(zeros(0,0),f,A,bupper,blower,sense;A_rowmaj))
+    return DAQP.solve(d);
+end
 """
 	d = DAQP.Model() 
 creates an empty optimization model `d`. 
@@ -131,7 +168,7 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
   return exitflag, setup_time
 end
 
-function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble},sense::Vector{Cint};A_rowmaj=false)
+function setup(daqp::DAQP.Model, H::Matrix{Cdouble},f::Vector{Cdouble},A::Matrix{Cdouble},bupper::Vector{Cdouble},blower::Vector{Cdouble}=Cdouble[],sense::Vector{Cint}=Cint[];A_rowmaj=false)
   return setup(daqp,QPj(H,f,A,bupper,blower,sense;A_rowmaj))
 end
 

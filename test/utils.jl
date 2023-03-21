@@ -1,3 +1,5 @@
+using Random
+## QP
 function generate_test_QP(n,m,ms,nActive,kappa)
   # * Transform QP to LDP with T = L Q' (where L is diagonal and Q is orthogonal) 
   # to get solution  u =T(x+f) (=> H = T'*T, f = T'*v) 
@@ -49,3 +51,40 @@ function generate_test_QP(n,m,ms,nActive,kappa)
   sense=zeros(Cint,m)
   return x,H,f,A,bupper,blower,sense
 end
+
+## LP
+function generate_test_LP(n,m,ms)
+    A = [Matrix(I(n)[1:ms,:]);randn(m-ms,n)];
+    bupper = zeros(m);
+    blower = zeros(m);
+    shuffle_inds= randperm(m);
+    nActive_upper = rand(1:n+1) - 1;
+    nActive_lower= n - nActive_upper; 
+    ids_active_upper = shuffle_inds[1:nActive_upper];
+    ids_active_lower = shuffle_inds[nActive_upper+1:n];
+    ids_inactive = shuffle_inds[n+1:m];
+
+    λ = rand(n); # λ ≥ 0 (dual feasible)  
+    x = randn(n);
+
+    Aa = [A[ids_active_upper,:];-A[ids_active_lower,:]];
+    f = -Aa'*λ;
+
+    ba = Aa*x;
+    bupper[ids_active_upper] = ba[1:nActive_upper];
+    blower[ids_active_lower] = -ba[nActive_upper+1:n];
+
+
+    # * Make the inactive constraints feasible *
+    bounds_gap = 1; # Scaling factor for distance between bounds
+    slack_gap= 1; # Scaling factor for distance between bounds and optimizer 
+    bupper[ids_active_lower] = blower[ids_active_lower]+bounds_gap*(0.01 .+ rand(nActive_lower));
+    blower[ids_active_upper] = bupper[ids_active_upper]-bounds_gap*(0.01 .+ rand(nActive_upper));
+
+    bupper[ids_inactive] = A[ids_inactive,:]*x + slack_gap*(0.01 .+ rand(length(ids_inactive))); 
+    blower[ids_inactive] = A[ids_inactive,:]*x - slack_gap*(0.01 .+ rand(length(ids_inactive))); 
+    A = A[ms+1:end,:];  #simple bounds are implicitly defined, so remove them from A.
+    sense = zeros(Int32,m)
+    return x,f,A,bupper,blower,sense
+end
+

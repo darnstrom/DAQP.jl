@@ -5,7 +5,7 @@ using DAQP
 include(joinpath(dirname(@__FILE__), "utils.jl"))
 
 # API Tests
-nQPs = 100;
+nQPs,nLPs = 100,100;
 n = 100; m = 500; ms = 50;
 nAct = 80
 kappa = 1e2
@@ -15,6 +15,34 @@ tol = 1e-4
 	xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
 	x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
 	@test norm(xref-x) < tol;
+  end
+end
+
+@testset "Quadprog (one-sided)" begin
+  for nQP in 1:10
+	_,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
+    blower = fill(-1e30,length(bupper))
+	xref,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
+	x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper);
+	@test norm(xref-x) < tol;
+  end
+end
+
+@testset "Linprog (C )" begin
+  for nQP in 1:nQPs
+	xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
+	x,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
+	@test norm(xref-x) < tol;
+  end
+end
+
+@testset "Linprog (one-sided)" begin
+  for nQP in 1:10
+	_,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
+    blower = fill(-1e30,length(bupper))
+	xref,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
+	x,fval,exitflag,info = DAQP.linprog(f,A,bupper);
+    @test abs(f'*(xref-x)) < tol;
   end
 end
 
