@@ -177,20 +177,18 @@ end
 function updateLDLremove(L,D,i)
     # Output Lup, Dup
     # ith row removed
-    # TODO no need to extract L1 and L3
-    k = size(L,1);
-    L1 = L[1:i-1,1:i-1];
-    D1 = D[1:i-1];
-    L3 = L[i+1:k,1:i-1];
+    k = length(D);
+    Lup, Dup = zeros(k-1,k-1), zeros(k-1)
+    Lup[1:i-1, 1:i-1] = view(L, 1:i-1, 1:i-1);
+    Lup[i:end, 1:i-1] = view(L, i+1:k, 1:i-1);
+    Dup[1:i-1] = view(D,1:i-1);
 
     d = D[i];
     l =L[i+1:k,i];
     L2 =L[i+1:k,i+1:k];
     D2 = D[i+1:k];
 
-    L2_tilde,D2_tilde =rankone_add_LDL(L2,D2,l,d);
-    Lup = [L1 zeros(i-1,k-i);L3 L2_tilde];
-    Dup = [D1;D2_tilde];
+    Lup[i:k-1,i:k-1], Dup[i:k-1] = rankone_add_LDL(L2, D2, l, d);
     return Lup, Dup
 end
 
