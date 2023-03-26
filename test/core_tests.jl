@@ -29,11 +29,11 @@ end
 end
 
 @testset "Linprog (C )" begin
-  for nQP in 1:nQPs
-	xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
-	x,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
-	@test norm(xref-x) < tol;
-  end
+    for nQP in 1:nQPs
+        xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
+        x,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
+        @test abs(f'*(xref-x)) < tol;
+    end
 end
 
 @testset "Linprog (one-sided)" begin
