@@ -23,9 +23,10 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings())
 	singular_ind= findfirst(D.<=settings.zero_tol); # Zero element in D signifies singularity
 	if(isnothing(singular_ind)) # "Normal iteration 
 	  if(!isempty(AS))
-		y= -forward_L(L,d[AS]);
-		z= y./D;
-		lambda_star= backward_L(L,z);
+          lambda_star = -d[AS]
+          forward_L!(L,lambda_star);
+          lambda_star ./= D
+          backward_L!(L,lambda_star);
 	  else
 		lambda_star=Float64[]
 	  end
@@ -123,102 +124,107 @@ end
 
 
 # ========= Factorization code ============
-function forward_L(L,b)
-  # Solve L x = b
-  n = size(b,1);
-  x = deepcopy(b);
-  for i in 1:n
-	for j in 1:(i-1)
-	  x[i,:] -= L[i,j]*x[j,:];
-	end
-  end
-  return x
+function forward_L!(L,b)
+    # Solve L x = b
+    n = length(b);
+    ldiv!(UnitLowerTriangular(view(L,1:n,1:n)),b)
+    #for i in 1:n
+    #    for j in 1:(i-1)
+    #        @inbounds b[i] -= L[i,j]*b[j];
+    #    end
+    #end
 end
 
-function backward_L(L,b)
-  # Solve L'x = b
-  n = size(b,1);
-  x = deepcopy(b); 
-  for i = n:-1:1
-	for j = i+1:n
-	  x[i,:] -= L[j,i]*x[j,:];
-	end
-  end
-  return x
+function backward_L!(L,b)
+    # Solve L'x = b
+    n = length(b);
+    ldiv!(UnitLowerTriangular(view(L,1:n,1:n))',b)
+    #for i = n:-1:1
+    #    for j = i+1:n
+    #        @inbounds b[i] -= L[j,i]*b[j];
+    #    end
+    #end
 end
 
 function updateLDLadd(L,D,b,bet;precision=Float64)
-  # Return Lup, Dup
-  # compute Lup Dup s.t. Lup Dup Lup' = [A;a'] [A;a']'
-  # when A A' = LDL'
-  #b = A*a, bet = a'*a
-  if(isempty(D))
-	return ones(1,1),[D;bet] 
-  end
-  k = size(L,1);
-  #c = L\b; # Implement own backwards solve?
-  c = forward_L(L,b); # Implement own backwards solve?
-  l = zeros(precision,k);
-  for i = 1:k
-	if(D[i]>1e-9)
-	  l[i] = c[i]/D[i];
-	end
-  end
-  d = bet-(l.*D)'*l;
-  if(d<1e-9)
-	d = 0;
-  end
-  Lup = [L zeros(precision,k,1);l' 1];
-  return Lup,[D;d]
+    # Return Lup, Dup
+    # compute Lup Dup s.t. Lup Dup Lup' = [A;a'] [A;a']'
+    # when A A' = LDL'
+    #b = A*a, bet = a'*a
+    @inbounds begin
+        k = length(b);
+        Ln = zeros(k+1,k+1) 
+        Ln[1:k,1:k] = L
+        Ln[k+1,k+1] = 1
+        if(isempty(D))
+            return Ln,[D;bet] 
+        end
+        forward_L!(L,b);
+        d = bet
+        for i = 1:k
+            if(D[i]>1e-9)
+                Ln[k+1,i] = b[i]/D[i];
+            end
+            d -= D[i]*Ln[k+1,i]^2
+        end
+        if(d<1e-9)
+            d = 0;
+        end
+        return Ln,[D;d]
+    end
 end
 
 function updateLDLremove(L,D,i)
-  # Output Lup, Dup
-  # ith row removed
-  # TODO no need to extract L1 and L3
-  k = size(L,1);
-  L1 = L[1:i-1,1:i-1];
-  D1 = D[1:i-1];
-  L3 = L[i+1:k,1:i-1];
- 
-  d = D[i];
-  l =L[i+1:k,i];
-  L2 =L[i+1:k,i+1:k];
-  D2 = D[i+1:k];
-  
-  L2_tilde,D2_tilde =rankone_add_LDL(L2,D2,l,d);
-  Lup = [L1 zeros(i-1,k-i);L3 L2_tilde];
-  Dup = [D1;D2_tilde];
-  return Lup, Dup
+    # Output Lup, Dup
+    # ith row removed
+    # TODO no need to extract L1 and L3
+    k = size(L,1);
+    L1 = L[1:i-1,1:i-1];
+    D1 = D[1:i-1];
+    L3 = L[i+1:k,1:i-1];
+
+    d = D[i];
+    l =L[i+1:k,i];
+    L2 =L[i+1:k,i+1:k];
+    D2 = D[i+1:k];
+
+    L2_tilde,D2_tilde =rankone_add_LDL(L2,D2,l,d);
+    Lup = [L1 zeros(i-1,k-i);L3 L2_tilde];
+    Dup = [D1;D2_tilde];
+    return Lup, Dup
 end
 
 function rankone_add_LDL(L,D,l,delta;precision=Float64)
-  # Out put Lup, Dup
-  # Algorithm C1 Methods for modidfying matrix factorizations - Gill et al 1974
-  # Compute Lup Dup such that Lup Dup Lup' = LDL'+delta*l l'
-  n = length(l);
-  Dup = zeros(precision,n) ;
-  Lup = Matrix{precision}(I, n, n);
+    # Out put Lup, Dup
+    # Algorithm C1 Methods for modidfying matrix factorizations - Gill et al 1974
+    # Compute Lup Dup such that Lup Dup Lup' = LDL'+delta*l l'
+    n = length(l);
+    Dup = zeros(precision,n) ;
+    Lup = Matrix{precision}(I, n, n);
 
-  a = delta;
-  w = l ;
-  for j = 1:n
-	p = w[j] ;
-	Dup[j] = D[j] + a*p^2;
-	b = p*a/Dup[j];
-	a = D[j]*a/Dup[j];
-	for r = j+1:n
-	  w[r] = w[r] - p*L[r,j] ;
-	  Lup[r,j] = L[r,j] + b*w[r];
-	end
-  end
-  return Lup,Dup
+    a = delta;
+    w = l ;
+    @inbounds begin
+        for j = 1:n
+            p = w[j] ;
+            Dup[j] = D[j] + a*p^2;
+            b = p*a/Dup[j];
+            a = D[j]*a/Dup[j];
+            for r = j+1:n
+                w[r] = w[r] - p*L[r,j] ;
+                Lup[r,j] = L[r,j] + b*w[r];
+            end
+        end
+    end
+    return Lup,Dup
 end
 
 function compute_singulardirection(L,D,i;precision=Float64)
-  k = length(D);p = zeros(precision,k);
-  L1 = L[1:i-1,1:i-1]; l = L[i,1:i-1];
-  p[1:i-1] = -backward_L(L1,l);
-  p[i]= 1;
-  return p
+    @inbounds begin
+        k = length(D); p = zeros(precision,k);
+        p[1:i-1] = -view(L,i,1:i-1);
+        backward_L!(L,view(p,1:i-1));
+        p[i]= 1;
+    end
+    return p
 end
