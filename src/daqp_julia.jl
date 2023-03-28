@@ -1,6 +1,6 @@
 using LinearAlgebra 
 
-function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings())
+function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings(),selection_rule=DANTZIG)
   # Initial AS is union AS0 and equality constraints  
   AS = findall((senses.&IMMUTABLE).!=0); # Maybe this could be done better (i.e., input the indices..)
   AS = AS ∪ AS0;
@@ -40,7 +40,13 @@ function daqp_ldp_jl(M,d,AS0,senses;settings=DAQPSettings())
 		if(all(mu.>= -settings.primal_tol)) #Global optimum
 		  fin = true;
 		else # Negative mu
-		  _,free_ind = findmin(mu[:,1]);# Decide which component to free
+            # Decide which component to free
+          if(selection_rule == DANTZIG)
+            free_ind = argmin(mu[:,1]);# Decide which component to free
+          else
+            free_ind = findfirst(mu[:,1].< -settings.primal_tol);
+          end
+
 		  m = M[IS[free_ind],:];
 		  L,D = updateLDLadd(L,D,M[AS,:]*m,m'*m);
 		  #Update working set
@@ -92,7 +98,7 @@ function remove_constraint(lambda,AS,IS,L,D,p,block_inds)
 end
 
 
-function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings())
+function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings(),selection_rule=DANTZIG)
   R = cholesky((H+H')/2);
   M = A/R.U;
   v = (R.L)\f;
@@ -105,7 +111,7 @@ function daqp_jl(H,f,A,b,sense,AS;settings=DAQPSettings())
 	d[i,:]./=norm_factor;
   end
 
-  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings)
+  u,lam_opt,AS,Ju,iter,ASs = daqp_ldp_jl(M,d,AS,sense;settings,selection_rule)
   # Form solution to nomial problem
   if(!isempty(u))
 	x_opt=R.U\(-u-v);

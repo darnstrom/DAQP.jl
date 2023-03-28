@@ -1,4 +1,10 @@
 # Constraint types
+@enum SelectionRule begin
+    DANTZIG = 0
+    BLAND
+end
+
+
 const ACTIVE = 1
 const LOWER = 2 
 const IMMUTABLE= 4
