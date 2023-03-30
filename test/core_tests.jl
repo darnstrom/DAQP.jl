@@ -116,6 +116,7 @@ end
 
 @testset "C LDP interface" begin
   # Setup model and solve problem
+  n = 10; m = 50; ms = 5; nAct =0;
   xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
   p=DAQP.setup_c_workspace(n)
   A = A'[:,:] # since row major...
