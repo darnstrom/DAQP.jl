@@ -16,6 +16,11 @@ tol = 1e-4
 	x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
 	@test norm(xref-x) < tol;
   end
+  # Test quadprog interface by passing settings 
+  xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
+  s = DAQP.settings(DAQP.Model(),Dict(:iter_limit=>1))
+  x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense;settings=s)
+  @test exitflag == -4
 end
 
 @testset "Quadprog (one-sided)" begin
@@ -29,11 +34,11 @@ end
 end
 
 @testset "Linprog (C )" begin
-  for nQP in 1:nQPs
-	xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
-	x,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
-	@test norm(xref-x) < tol;
-  end
+    for nQP in 1:nQPs
+        xref,f,A,bupper,blower,sense = generate_test_LP(n,m,ms);
+        x,fval,exitflag,info = DAQP.linprog(f,A,bupper,blower,sense);
+        @test abs(f'*(xref-x)) < tol;
+    end
 end
 
 @testset "Linprog (one-sided)" begin
@@ -48,10 +53,12 @@ end
 
 @testset "Quadprog (JL)" begin
   qpj = DAQP.QPj()
-  for nQP in 1:22
-	xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
-	x,lam,AS,J,iter= DAQP.daqp_jl(H,f,[A;-A],[bupper;-blower],[sense;sense],Int64[]);
-	@test norm(xref-x) < tol;
+  for selection_rule in [DAQP.DANTZIG, DAQP.BLAND]
+      for nQP in 1:10
+          xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
+          x,lam,AS,J,iter= DAQP.daqp_jl(H,f,[A;-A],[bupper;-blower],[sense;sense],Int64[];selection_rule);
+          @test norm(xref-x) < tol;
+      end
   end
   # Test warm start
   xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
@@ -114,9 +121,14 @@ end
 
 @testset "C LDP interface" begin
   # Setup model and solve problem
+  n = 10; m = 50; ms = 5; nAct =0;
   xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
   p=DAQP.setup_c_workspace(n)
-  DAQP.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1.0) 
+  A = A'[:,:] # since row major...
+  DAQP.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1e30) 
+  @test isfeasible(p,m,ms)
+  bupper[1] = -1e30 #Make trivially infeasible
+  @test !isfeasible(p,m,ms;validate=true)
   work = unsafe_load(Ptr{DAQP.Workspace}(p));
   @test work.n == n
   DAQP.free_c_workspace(p)
