@@ -118,7 +118,11 @@ end
   # Setup model and solve problem
   xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
   p=DAQP.setup_c_workspace(n)
-  DAQP.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1.0) 
+  A = A'[:,:] # since row major...
+  DAQP.init_c_workspace_ldp(p,A,bupper,blower,sense;max_radius=1e30) 
+  @test isfeasible(p,m,ms)
+  bupper[1] = -1e30 #Make trivially infeasible
+  @test !isfeasible(p,m,ms;validate=true)
   work = unsafe_load(Ptr{DAQP.Workspace}(p));
   @test work.n == n
   DAQP.free_c_workspace(p)
