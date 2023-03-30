@@ -16,6 +16,11 @@ tol = 1e-4
 	x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense);
 	@test norm(xref-x) < tol;
   end
+  # Test quadprog interface by passing settings 
+  xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa);
+  s = DAQP.settings(DAQP.Model(),Dict(:iter_limit=>1))
+  x,fval,exitflag,info = DAQP.quadprog(H,f,A,bupper,blower,sense;settings=s)
+  @test exitflag == -4
 end
 
 @testset "Quadprog (one-sided)" begin

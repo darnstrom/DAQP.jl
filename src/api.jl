@@ -31,10 +31,10 @@ where `m = length(bupper)` and `ms = m-size(A,2)`.
 
 """
 function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
-        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false)
-    return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj))
+        A::Matrix{Float64},bupper::Vector{Float64},blower::Vector{Float64}=Float64[],sense::Vector{Cint}=Cint[];A_rowmaj=false,settings=nothing)
+    return quadprog(QPj(H,f,A,bupper,blower,sense;A_rowmaj);settings)
 end
-function quadprog(qpj::QPj)
+function quadprog(qpj::QPj;settings=nothing)
     # TODO: check validity of dimensions
     # Setup QP
     qp = QPc(qpj);
@@ -43,10 +43,12 @@ function quadprog(qpj::QPj)
     xstar = zeros(Float64,qp.n); 
     lam= zeros(Float64,qp.m); 
     result= Ref(DAQPResult(xstar,lam));
+    ptr_settings = settings isa DAQPSettings ? Ref(settings) : Ptr{DAQP.DAQPSettings}(C_NULL)
+
 
     ccall((:daqp_quadprog, DAQP.libdaqp), Nothing,
           (Ref{DAQP.DAQPResult},Ref{DAQP.QPc},Ref{DAQP.DAQPSettings}), 
-          result,Ref(qp),Ptr{DAQP.DAQPSettings}(C_NULL))
+          result,Ref(qp),ptr_settings)
 
     info = (x = xstar, λ=lam, fval=result[].fval,
             exitflag=result[].exitflag,
