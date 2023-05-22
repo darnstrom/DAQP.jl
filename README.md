@@ -15,7 +15,7 @@ licensed under the [MIT license](https://github.com/darnstrom/daqp/blob/master/L
 
 ## Installation
 
-Install DAQP.jl usinng the Julia package manager:
+Install DAQP.jl using the Julia package manager:
 
 ```julia
 import Pkg
@@ -25,7 +25,7 @@ Pkg.add("DAQP")
 ## Use with JuMP
 
 To use DAQP with JuMP, do:
-```
+```julia
 using JuMP, DAQP
 model = Model(DAQP.Optimizer)
 ```
@@ -34,4 +34,4 @@ model = Model(DAQP.Optimizer)
 
 General information about the solver is available at [https://darnstrom.github.io/daqp/](https://darnstrom.github.io/daqp/),
 and specifics for the Julia interface are available at
-[https://darnstrom.github.io/daqp/start/julia](https://darnstrom.github.io/daqp/start/julia). 
+[https://darnstrom.github.io/daqp/start/julia](https://darnstrom.github.io/daqp/start/julia).
