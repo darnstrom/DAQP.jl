@@ -23,6 +23,7 @@ is interpreted as
         -4.0 <= x₁ <= 1.0
         -5.0 <= x₂ <= 2.0
     -6.0 <= 7 x₁ + 8 x₂ <= 3.0
+
 ```
 
 # Input 
@@ -182,6 +183,7 @@ function setup(daqp::DAQP.Model, qp::DAQP.QPj)
         end
         # should be unsafe_copy_to
     end
+
     return exitflag, setup_time
 end
 
