@@ -1,33 +1,48 @@
 """
+# Example calls
     xstar, fval, exitflag, info = DAQP.quadprog(H,f,A,bupper)
     xstar, fval, exitflag, info = DAQP.quadprog(H,f,A,bupper,blower,sense) 
 
 finds the solution `xstar` to the quadratic program
 
 ```
-min_x	0.5 x' H x + f' x
-subject to 
-    blower[1:ms]	<= x[1:ms] <= bupper[1:ms]
-    blower[ms+1:m]  <= A*x 	   <= bupper[ms+1:m],
+ minimize	   0.5 x' H x + f' x
+subject to   blower <= A x <= bupper
 ```
-where `m = length(bupper)` and `ms = m-size(A,2)`.
+If `bupper` and `blower` have more elements than rows of `A`, the first
+elements are interpreted as simple bounds. For example:
+
+```
+    A = [7.0 8.0]
+    blower = [-4.0; -5.0; -6.0]
+    bupper = [ 1.0;  2.0;  3.0]
+```
+is interpreted as
+
+```
+        -4.0 <= x₁ <= 1.0
+        -5.0 <= x₂ <= 2.0
+    -6.0 <= 7 x₁ + 8 x₂ <= 3.0
+```
 
 # Input 
-* `H`  			- hessian of objective function, (`n x n`)-matrix
-* `f`  			- linear term in objective function, n-vector 
-* `A`  			- constraint normals, (`(m-ms) x n`)-matrix
-* `bupper` 		- upper bounds for constraints, `m`-vector
-* `blower` 		- lower bounds for constraints, `m`-vector (default: -Inf)
-* `sense` 		- constraint types,  `m`-vector of Cints (default: 0). Example types:
-  * `0` : inequality
-  * `5` : equality
-  * `16` : binary
+* `H`           - cost matrix
+* `f`           - cost vector
+* `A`           - linear constraint matrix
+* `buppe`       - upper bounds for constraints
+* `blower`      - lower bounds for constraints (default: -Inf)
+* `sense`       - constraint types, as a vector of Cints (default: 0). Example types:
+  * `0 ` : inequality
+  * `1 ` : active inequality (used as warm start)
+  * `5 ` : equality
+  * `8 ` : soft (allowed to be violated if necessary)
+  * `16` : binary (either upper or lower bound should hold with equality)
 
 # Output
-* `xstar` 		- solution provided by solver
-* `fval` 		- objective function value for `xstar`. 
-* `exitflag` 	- flag from solver (>0 success, <0 failure) 
-* `info` 		- tuple containing profiling information from the solver. 
+* `xstar`       - solution
+* `fval`        - objective function value for `xstar`. 
+* `exitflag`    - flag from solver (>0 success, <0 failure) 
+* `info`        - tuple containing profiling information from the solver. 
 
 """
 function quadprog(H::Matrix{Float64},f::Vector{Float64}, 
@@ -251,6 +266,12 @@ function update(daqp::DAQP.Model, H,f,A,bupper,blower,sense)
     unsafe_store!(work.qp,daqp.qpc);
 
     exitflag = ccall((:update_ldp,DAQP.libdaqp),Cint,(Cint,Ptr{DAQP.Workspace},), update_mask, daqp.work);
+end
+
+function codegen(d::DAQP.Model; fname="daqp_workspace", dir="",)
+    @assert(d.has_model, "setup the model before code generation")
+    exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
+                     (Ptr{DAQP.Workspace},Cstring,Cstring,), d.work,fname,dir);
 end
 
 function setup_c_workspace(n)::Ptr{Cvoid}

@@ -141,7 +141,7 @@ end
 ## Solver Attributes, get/set
 
 MOI.get(opt::Optimizer, ::MOI.SolverName)        = "DAQP" 
-MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.4.2"
+MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.5.0"
 MOI.get(opt::Optimizer, ::MOI.RawSolver)         = opt.model
 MOI.get(opt::Optimizer, ::MOI.ResultCount)       = opt.has_results ? 1 : 0
 MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) = opt.model.n
