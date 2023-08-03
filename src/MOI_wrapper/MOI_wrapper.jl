@@ -249,9 +249,12 @@ MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
 MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
     (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
+MOI.set(optimizer::Optimizer,a::MOI.VariablePrimalStart, vi::MOI.VariableIndex, value) = value
+
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = false
+
 
 ## Supported constraint types
 
