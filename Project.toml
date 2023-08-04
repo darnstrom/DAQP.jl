@@ -1,7 +1,7 @@
 name = "DAQP"
 uuid = "c47d62df-3981-49c8-9651-128b1cd08617"
 authors = ["Daniel Arnström <daniel.arnstrom@liu.se>"]
-version = "0.4.2"
+version = "0.5.0"
 
 [deps]
 DAQP_jll = "5c51c916-43bf-57fe-9d62-13064ebbf40d"
@@ -9,7 +9,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [compat]
-DAQP_jll = "0.4.0"
+DAQP_jll = "0.5.0"
 MathOptInterface = "1.1"
 julia = "1.6"
 
