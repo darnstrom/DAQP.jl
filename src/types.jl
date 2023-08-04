@@ -8,11 +8,9 @@ struct QPj
     bupper::Vector{Cdouble}
     blower::Vector{Cdouble}
     sense::Vector{Cint}
-    bin_ids::Vector{Cint}
-    nb::Cint
 end
 function QPj() 
-    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0),Vector{Cint}(undef,0),0)
+    return QPj(0,0,0,Matrix{Cdouble}(undef,0,0),Vector{Cdouble}(undef,0),Matrix{Cdouble}(undef,0,0), Vector{Cdouble}(undef,0), Vector{Cdouble}(undef,0), Vector{Cint}(undef,0))
 end
 function QPj(H::Matrix{Float64},f::Vector{Float64},
         A::Matrix{Float64},bupper::Vector{Float64}, blower::Vector{Float64},
@@ -27,12 +25,10 @@ function QPj(H::Matrix{Float64},f::Vector{Float64},
     sense = isempty(sense) ? zeros(Cint,length(bupper)) : sense
     m = length(bupper);
     ms = m-mA;
-    bin_ids = findall(sense.&BINARY .!=0).-1;
-    nb = length(bin_ids)
     if(!A_rowmaj)
         A = A' # Transpose A for col => row major
     end
-    return QPj(n,m,ms,H,f,A,bupper,blower,sense,bin_ids,nb)
+    return QPj(n,m,ms,H,f,A,bupper,blower,sense)
 end
 
 struct QPc 
@@ -45,8 +41,6 @@ struct QPc
     bupper::Ptr{Cdouble}
     blower::Ptr{Cdouble}
     sense::Ptr{Cint}
-    bin_ids::Ptr{Cint}
-    nb::Cint
 end
 function QPc(qpj::QPj)
     H_ptr = isempty(qpj.H) ? C_NULL : pointer(qpj.H)
@@ -54,7 +48,7 @@ function QPc(qpj::QPj)
     return QPc(qpj.n,qpj.m,qpj.ms,
                H_ptr,f_ptr,
                pointer(qpj.A),pointer(qpj.bupper),pointer(qpj.blower),pointer(qpj.sense)
-               ,pointer(qpj.bin_ids),qpj.nb)
+               )
 end
 
 struct DAQPSettings
@@ -111,6 +105,7 @@ struct Workspace
     v::Ptr{Cdouble}
     sense::Ptr{Cint}
     scaling::Ptr{Cdouble}
+    RinvD::Ptr{Cdouble}
 
     x::Ptr{Cdouble}
     xold::Ptr{Cdouble}

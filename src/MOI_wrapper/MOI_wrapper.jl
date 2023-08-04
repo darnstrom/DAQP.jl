@@ -141,7 +141,7 @@ end
 ## Solver Attributes, get/set
 
 MOI.get(opt::Optimizer, ::MOI.SolverName)        = "DAQP" 
-MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.4.2"
+MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.5.0"
 MOI.get(opt::Optimizer, ::MOI.RawSolver)         = opt.model
 MOI.get(opt::Optimizer, ::MOI.ResultCount)       = opt.has_results ? 1 : 0
 MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) = opt.model.n
@@ -249,9 +249,12 @@ MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
 MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
     (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
+MOI.set(optimizer::Optimizer,a::MOI.VariablePrimalStart, vi::MOI.VariableIndex, value) = value
+
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = false
+
 
 ## Supported constraint types
 
