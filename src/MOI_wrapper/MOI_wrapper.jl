@@ -249,7 +249,12 @@ MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
 MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
     (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
+MOI.supports(::Optimizer, ::MOI.VariablePrimalStart,::Type{MOI.VariableIndex},) = true
 MOI.set(optimizer::Optimizer,a::MOI.VariablePrimalStart, vi::MOI.VariableIndex, value) = value
+function MOI.get(opt::Optimizer, a::MOI.VariablePrimalStart, vi::MOI.VariableIndex)
+    MOI.check_result_index_bounds(opt, a)
+    return opt.info.x[vi.value]
+end
 
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
