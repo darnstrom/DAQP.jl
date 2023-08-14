@@ -258,12 +258,8 @@ function MOI.set(
     return
 end
 
-function MOI.get(
-    model::Optimizer,
-    ::MOI.VariablePrimalStart,
-    vi::MOI.VariableIndex,
-)
-    return model.info.x[vi.value]
+function MOI.get(model::Optimizer, ::MOI.VariablePrimalStart,vi::MOI.VariableIndex,)
+    return isnothing(model.info) ? nothing : model.info.x[vi.value]
 end
 MOI.supports(::Optimizer, ::MOI.VariablePrimalStart,::Type{MOI.VariableIndex}) = true
 
@@ -345,7 +341,7 @@ function copy_to_check_attributes(dest, src)
 
     #allowable variable attributes
     for attr in MOI.get(src, MOI.ListOfVariableAttributesSet())
-        if attr == MOI.VariableName()
+        if attr == MOI.VariableName() || attr == MOI.VariablePrimalStart()
             continue
         end
         throw(MOI.UnsupportedAttribute(attr))
