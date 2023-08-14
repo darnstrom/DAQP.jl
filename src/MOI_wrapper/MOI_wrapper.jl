@@ -249,7 +249,19 @@ MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
 MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
     (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
-MOI.set(optimizer::Optimizer,a::MOI.VariablePrimalStart, vi::MOI.VariableIndex, value) = value
+function MOI.set(
+    model::Optimizer,
+    ::MOI.VariablePrimalStart,
+    ::MOI.VariableIndex,
+    ::Union{Nothing,Float64},
+)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.VariablePrimalStart,vi::MOI.VariableIndex,)
+    return isnothing(model.info) ? nothing : model.info.x[vi.value]
+end
+MOI.supports(::Optimizer, ::MOI.VariablePrimalStart,::Type{MOI.VariableIndex}) = true
 
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
@@ -329,7 +341,7 @@ function copy_to_check_attributes(dest, src)
 
     #allowable variable attributes
     for attr in MOI.get(src, MOI.ListOfVariableAttributesSet())
-        if attr == MOI.VariableName()
+        if attr == MOI.VariableName() || attr == MOI.VariablePrimalStart()
             continue
         end
         throw(MOI.UnsupportedAttribute(attr))
