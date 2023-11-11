@@ -145,6 +145,7 @@ end
 function delete!(daqp::DAQP.Model)
     if(daqp.work != C_NULL)
         ccall((:free_daqp_workspace,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
+        ccall((:free_daqp_ldp,DAQP.libdaqp),Nothing,(Ptr{DAQP.Workspace},),daqp.work)
         Libc.free(daqp.work);
         daqp.work = C_NULL
         Libc.free(daqp.qpc_ptr);

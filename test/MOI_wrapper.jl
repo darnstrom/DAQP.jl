@@ -57,8 +57,14 @@ function test_runtests()
         exclude = [ # Bin only supported for strictly convex objective in DAQP
             "test_constraint_ZeroOne_",
             "test_variable_solve_ZeroOne_",
+            "test_cpsat_",
+            "test_linear_Indicator_ON_ONE",
+            "test_solve_ObjectiveBound_MAX_SENSE_IP",
+            "test_solve_ObjectiveBound_MIN_SENSE_IP",
+            "test_solve_SOS2_",
+            "test_variable_solve_Integer_with_",
         ],
-        exclude_tests_after = v"0.10.5",
+        exclude_tests_after = v"1.22.0",
     )
     return
 end
