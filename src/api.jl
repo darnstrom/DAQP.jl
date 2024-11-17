@@ -271,10 +271,33 @@ function update(daqp::DAQP.Model, H,f,A,bupper,blower,sense)
     exitflag = ccall((:update_ldp,DAQP.libdaqp),Cint,(Cint,Ptr{DAQP.Workspace},), update_mask, daqp.work);
 end
 
-function codegen(d::DAQP.Model; fname="daqp_workspace", dir="",)
+using Downloads
+function codegen(d::DAQP.Model; fname="daqp_workspace", dir="codegen", src=false)
     @assert(d.has_model, "setup the model before code generation")
+
+    dir[end] != '/' && (dir*="/") ## Make sure it is correct directory path
+    isdir(dir) || mkdir(dir)
+
     exitflag = ccall((:render_daqp_workspace, libdaqp),Cvoid,
                      (Ptr{DAQP.Workspace},Cstring,Cstring,), d.work,fname,dir);
+    if src
+        cfiles = ["daqp.c","auxiliary.c","factorization.c"]
+        hfiles = ["daqp.h","auxiliary.h","factorization.h","constants.h", "types.h"]
+ 
+        # Append BnB code if there are any binary variables
+        if any((d.qpj.sense.&BINARY).==BINARY)
+            push!(cfiles,"bnb.c")
+            push!(hfiles,"bnb.h")
+        end
+
+        # Copy source files from GitHub
+        for f in cfiles
+            Downloads.download("https://raw.githubusercontent.com/darnstrom/daqp/master/src/"*f, dir*f)
+        end
+        for f in hfiles
+            Downloads.download("https://raw.githubusercontent.com/darnstrom/daqp/master/include/"*f, dir*f)
+        end
+    end
 end
 
 function setup_c_workspace(n)::Ptr{Cvoid}

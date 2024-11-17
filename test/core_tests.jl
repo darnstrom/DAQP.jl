@@ -133,3 +133,13 @@ end
   @test work.n == n
   DAQP.free_c_workspace(p)
 end
+
+@testset "Code generation" begin
+  n = 5; m = 5; ms = 5; nAct =2;
+  xref,H,f,A,bupper,blower,sense = generate_test_QP(n,m,ms,nAct,kappa)
+  sense[1] = DAQP.BINARY
+  d = DAQP.Model()
+  DAQP.setup(d,H,f,A,bupper,blower,sense)
+  DAQP.codegen(d,dir="codegen",src=true)
+  rm("codegen",recursive=true)
+end
