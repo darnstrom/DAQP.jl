@@ -4,14 +4,16 @@ authors = ["Daniel Arnström <daniel.arnstrom@liu.se>"]
 version = "0.6.0"
 
 [deps]
-DAQP_jll = "5c51c916-43bf-57fe-9d62-13064ebbf40d"
+DAQPBase = "833476c3-a8c0-4073-9b64-6473509843fe"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
-DAQP_jll = "0.6.0"
 MathOptInterface = "1.1"
+DAQPBase = "0.2"
+Reexport= "1.2.2"
 julia = "1.6"
 
 [extras]
