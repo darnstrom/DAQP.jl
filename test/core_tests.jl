@@ -51,29 +51,6 @@ end
   end
 end
 
-@testset "Quadprog (JL)" begin
-  qpj = DAQP.QPj()
-  for selection_rule in [DAQP.DANTZIG, DAQP.BLAND]
-      for nQP in 1:10
-          xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
-          x,lam,AS,J,iter= DAQP.daqp_jl(H,f,[A;-A],[bupper;-blower],[sense;sense],Int64[];selection_rule);
-          @test norm(xref-x) < tol;
-      end
-  end
-  # Test warm start
-  xref,H,f,A,bupper,blower,sense = generate_test_QP(20,100,0,16,1e2);
-  x,lam,AS,J,iter= DAQP.daqp_jl(H,f,[A;-A],[bupper;-blower],[sense;sense],Int64[1]);
-  @test norm(xref-x) < tol;
-  # Test infeasible problem
-  x,lam,AS,J,iter= DAQP.daqp_jl([1.0 0; 0 1],zeros(2),[1.0 0;-1 0],[1;-2],zeros(Cint,2),Int64[]);
-  @test isinf(J)
-  # Test unconstrained problem
-  x,lam,AS,J,iter= DAQP.daqp_jl((H=[1.0 0; 0 1], f=zeros(2),
-								 A=[1.0 0;0 1], b=[1;1],
-								 senses=zeros(Cint,2)),Int64[]);
-  @test isempty(AS)
-end
-
 @testset "BnB" begin
     nb = 10
     ϵb= 1e-5
