@@ -1,7 +1,7 @@
 name = "DAQP"
 uuid = "c47d62df-3981-49c8-9651-128b1cd08617"
 authors = ["Daniel Arnström <daniel.arnstrom@liu.se>"]
-version = "0.7.1"
+version = "0.7.2"
 
 [deps]
 DAQPBase = "833476c3-a8c0-4073-9b64-6473509843fe"
