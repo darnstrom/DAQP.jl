@@ -27,6 +27,7 @@ const DAQPtoMOITerminationStatus = Dict([
     DAQP.CYCLE           =>  MOI.SLOW_PROGRESS,
     DAQP.UNBOUNDED       =>  MOI.DUAL_INFEASIBLE,
     DAQP.ITERLIMIT       =>  MOI.ITERATION_LIMIT,
+    DAQP.TIMELIMIT       =>  MOI.TIME_LIMIT,
     DAQP.NONCONVEX       =>  MOI.INVALID_MODEL,
     DAQP.OVERDETERMINED  =>  MOI.INVALID_OPTION,
 ])
@@ -38,6 +39,7 @@ const DAQPtoMOIPrimalStatus = Dict([
     DAQP.CYCLE           =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.UNBOUNDED       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.ITERLIMIT       =>  MOI.UNKNOWN_RESULT_STATUS,
+    DAQP.TIMELIMIT       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.NONCONVEX       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.OVERDETERMINED  =>  MOI.UNKNOWN_RESULT_STATUS,
 ])
@@ -49,6 +51,7 @@ const DAQPtoMOIDualStatus = Dict([
     DAQP.CYCLE           =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.UNBOUNDED       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.ITERLIMIT       =>  MOI.UNKNOWN_RESULT_STATUS,
+    DAQP.TIMELIMIT       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.NONCONVEX       =>  MOI.UNKNOWN_RESULT_STATUS,
     DAQP.OVERDETERMINED  =>  MOI.UNKNOWN_RESULT_STATUS,
 ])
@@ -67,6 +70,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     silent::Bool
     settings::DAQPSettings
     info #TODO: specify type
+    primal_start::Vector{Cdouble}
+    dual_start::Vector{Cdouble}
+    time_limit_sec::Union{Nothing, Float64}
 
     function Optimizer(; user_settings...)
         model = DAQP.Model()
@@ -78,7 +84,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         setup_time = 0.0
         silent=true
         optimizer = new(model,has_results,is_empty,sense,
-                        objconstant,rows,setup_time,silent,settings(model),nothing)
+                        objconstant,rows,setup_time,silent,settings(model),nothing,
+                        zeros(0),zeros(0),nothing)
         for (key, value) in user_settings
             MOI.set(optimizer, MOI.RawOptimizerAttribute(string(key)), value)
         end
@@ -100,6 +107,8 @@ function MOI.empty!(optimizer::Optimizer)
     optimizer.sense = MOI.MIN_SENSE # model parameter, so needs to be reset
     optimizer.objconstant = 0.0 
     optimizer.rows = Dict{Int, Int}()
+    optimizer.primal_start = zeros(0)
+    optimizer.dual_start = zeros(0)
 end
 
 MOI.is_empty(optimizer::Optimizer) = optimizer.is_empty
@@ -108,6 +117,8 @@ function MOI.optimize!(optimizer::Optimizer)
     if(!optimizer.is_empty)
         ~,~,~,optimizer.info=DAQP.solve(optimizer.model)
         optimizer.has_results = true
+        optimizer.primal_start = zeros(0) # workspace retains warm start internally
+        optimizer.dual_start = zeros(0)
         settings(optimizer.model,optimizer.settings) # restore settings 
     end
     return
@@ -249,23 +260,61 @@ MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value) =
 MOI.get(opt::Optimizer, ::MOI.ObjectiveBound) =
     (opt.has_results) ? MOI.get(opt, MOI.DualObjectiveValue()) : opt.settings.fval_bound
 
-function MOI.set(
-    model::Optimizer,
-    ::MOI.VariablePrimalStart,
-    ::MOI.VariableIndex,
-    ::Union{Nothing,Float64},
-)
-    return
+MOI.supports(::Optimizer, ::MOI.VariablePrimalStart, ::Type{MOI.VariableIndex}) = true
+
+function MOI.set(opt::Optimizer, ::MOI.VariablePrimalStart, vi::MOI.VariableIndex, v::Float64)
+    n = vi.value
+    if length(opt.primal_start) < n
+        append!(opt.primal_start, zeros(Cdouble, n - length(opt.primal_start)))
+    end
+    opt.primal_start[n] = v
 end
 
-function MOI.get(model::Optimizer, ::MOI.VariablePrimalStart,vi::MOI.VariableIndex,)
-    return isnothing(model.info) ? nothing : model.info.x[vi.value]
+function MOI.set(opt::Optimizer, ::MOI.VariablePrimalStart, vi::MOI.VariableIndex, ::Nothing)
+    opt.primal_start = zeros(0)
 end
-MOI.supports(::Optimizer, ::MOI.VariablePrimalStart,::Type{MOI.VariableIndex}) = true
+
+function MOI.get(opt::Optimizer, ::MOI.VariablePrimalStart, vi::MOI.VariableIndex)
+    if isempty(opt.primal_start) || vi.value > length(opt.primal_start)
+        return nothing
+    end
+    return opt.primal_start[vi.value]
+end
+
+MOI.supports(::Optimizer, ::MOI.ConstraintDualStart) = true
+
+function MOI.set(opt::Optimizer, ::MOI.ConstraintDualStart, ci::MOI.ConstraintIndex, v::Float64)
+    haskey(opt.rows, ci.value) || return
+    row = opt.rows[ci.value]
+    m = length(opt.model.qpj.bupper)
+    if isempty(opt.dual_start)
+        opt.dual_start = zeros(Cdouble, m)
+    end
+    opt.dual_start[row] = -v  # negate from MOI to DAQP convention
+end
+
+function MOI.set(opt::Optimizer, ::MOI.ConstraintDualStart, ci::MOI.ConstraintIndex, ::Nothing)
+    opt.dual_start = zeros(0)
+end
+
+function MOI.get(opt::Optimizer, ::MOI.ConstraintDualStart, ci::MOI.ConstraintIndex)
+    isempty(opt.dual_start) && return nothing
+    haskey(opt.rows, ci.value) || return nothing
+    row = opt.rows[ci.value]
+    row > length(opt.dual_start) && return nothing
+    return -opt.dual_start[row]  # negate back to MOI convention
+end
 
 # not currently supported
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = false
-MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = false
+
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = opt.time_limit_sec
+
+function MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, v::Union{Nothing, Float64})
+    opt.time_limit_sec = v
+    settings(opt.model, Dict(:time_limit => isnothing(v) ? 0.0 : v))
+end
 
 
 ## Supported constraint types
@@ -308,10 +357,39 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.sense = MOI.get(src, MOI.ObjectiveSense())
     H, f, dest.objconstant = process_objective(dest, src, idxmap)
 
+    # Collect warm start if provided
+    vis_src = MOI.get(src, MOI.ListOfVariableIndices())
+    dest.primal_start = zeros(0)
+    for vi in vis_src
+        v = MOI.get(src, MOI.VariablePrimalStart(), vi)
+        if !isnothing(v)
+            if isempty(dest.primal_start)
+                dest.primal_start = zeros(Cdouble, length(vis_src))
+            end
+            dest.primal_start[idxmap[vi].value] = v
+        end
+    end
+
+    n = MOI.get(src, MOI.NumberOfVariables())
+    m = isempty(dest.rows) ? n : maximum(values(dest.rows))
+    dest.dual_start = zeros(0)
+    for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
+        for ci in MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
+            v = MOI.get(src, MOI.ConstraintDualStart(), ci)
+            if !isnothing(v)
+                if isempty(dest.dual_start)
+                    dest.dual_start = zeros(Cdouble, m)
+                end
+                row = dest.rows[idxmap[ci].value]
+                dest.dual_start[row] = -v  # negate from MOI to DAQP convention
+            end
+        end
+    end
+
     # Setup solver
     dest.settings = settings(dest.model) # Cache settings in case eps_prox is changed
 
-    exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+    exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true,primal_start=dest.primal_start,dual_start=dest.dual_start)
     if(exitflag < 0)
         # Ensure their is no binary constraint
         @assert(!any((sense.&BINARY).==BINARY),
@@ -320,7 +398,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
         eps_prox = 1e-7 # 
         @warn "The objective is not strictly convex, updating settings with eps_prox=$eps_prox"
         settings(dest.model,Dict(:eps_prox=>eps_prox))
-        exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true)
+        exitflag, dest.setup_time = DAQP.setup(dest.model,H,f,A,bupper, blower, sense;A_rowmaj=true,primal_start=dest.primal_start,dual_start=dest.dual_start)
         @assert(exitflag>=0, "DAQP failed when setting up the problem\nDAQP only supports convex objectives.")
     end
     dest.is_empty = false
@@ -353,7 +431,7 @@ function copy_to_check_attributes(dest, src)
             throw(MOI.UnsupportedConstraint{F, S}())
         end
         for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F, S}())
-            if attr == MOI.ConstraintName()
+            if attr == MOI.ConstraintName() || attr == MOI.ConstraintDualStart()
                 continue
             end
             throw(MOI.UnsupportedAttribute(attr))
