@@ -1,6 +1,6 @@
 name = "DAQP"
 uuid = "c47d62df-3981-49c8-9651-128b1cd08617"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Daniel Arnström <daniel.arnstrom@liu.se>"]
 
 [deps]
@@ -11,7 +11,7 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
-DAQPBase = "0.4.4"
+DAQPBase = "~0.5.0"
 MathOptInterface = "1.1"
 Reexport = "1.2.2"
 julia = "1.6"
