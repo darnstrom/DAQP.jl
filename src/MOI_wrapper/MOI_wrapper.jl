@@ -65,7 +65,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     is_empty::Bool
     sense::MOI.OptimizationSense
     objconstant::Cdouble
-    rows::Dict{Int, Int}
+    rows::Dict{Int64, Int64}
     setup_time::Cdouble
     silent::Bool
     settings::DAQPSettings
@@ -80,7 +80,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         is_empty = true
         sense = MOI.MIN_SENSE
         objconstant = 0.0 
-        rows = Dict{Int, Int}()
+        rows = Dict{Int64, Int64}()
         setup_time = 0.0
         silent=true
         optimizer = new(model,has_results,is_empty,sense,
@@ -106,7 +106,7 @@ function MOI.empty!(optimizer::Optimizer)
     optimizer.is_empty = true
     optimizer.sense = MOI.MIN_SENSE # model parameter, so needs to be reset
     optimizer.objconstant = 0.0 
-    optimizer.rows = Dict{Int, Int}()
+    optimizer.rows = Dict{Int64, Int64}()
     optimizer.primal_start = zeros(0)
     optimizer.dual_start = zeros(0)
 end
@@ -466,7 +466,7 @@ end
 
 
 function assign_constraint_rows!(
-    rows::Dict{Int, Int},
+    rows::Dict{Int64, Int64},
     idxmap::MOIU.IndexMap,
     src::MOI.ModelLike
 )
@@ -535,7 +535,7 @@ function process_constraints!(
     offset::Vector{Cdouble},
     src::MOI.ModelLike,
     idxmap,
-    rows::Dict{Int,Int},
+    rows::Dict{Int64,Int64},
     F::Type{<:MOI.AbstractFunction},
     S::Type{<:MOI.AbstractSet},
 )
@@ -552,15 +552,15 @@ function process_constraints!(
     return
 end
 
-extract_offset(::Vector{Cdouble}, ::Int, ::MOI.VariableIndex) = nothing
-extract_A(::Matrix{Cdouble},::MOI.VariableIndex,::Int, Any) = nothing
+extract_offset(::Vector{Cdouble}, ::Integer, ::MOI.VariableIndex) = nothing
+extract_A(::Matrix{Cdouble},::MOI.VariableIndex,::Integer, Any) = nothing
 
-function extract_offset(offset::Vector{Cdouble}, row::Int, f::Affine)
+function extract_offset(offset::Vector{Cdouble}, row::Integer, f::Affine)
     offset[row] = MOI.constant(f, Cdouble)
     return
 end
 
-function extract_A(A::Matrix{Cdouble}, f::Affine, row::Int, idxmap)
+function extract_A(A::Matrix{Cdouble}, f::Affine, row::Integer, idxmap)
     for term in f.terms
         var = term.variable
         col = idxmap[var].value
@@ -572,7 +572,7 @@ function extract_b(
     bupper::Vector{Cdouble},
     blower::Vector{Cdouble},
     sense::Vector{Cint},
-    row::Int,
+    row::Integer,
     f::Affine,
     s::SupportedSets,
 )
@@ -584,7 +584,7 @@ function extract_b(
     bu::Vector{Cdouble},
     bl::Vector{Cdouble},
     sense::Vector{Cint},
-    row::Int,
+    row::Integer,
     f::MOI.VariableIndex,
     s::SupportedSets,
 )
@@ -598,7 +598,7 @@ function extract_b(
     bupper::Vector{Cdouble},
     blower::Vector{Cdouble},
     sense::Vector{Cint},
-    row::Int,
+    row::Integer,
     interval::Interval,
 )
     bupper[row] = interval.upper

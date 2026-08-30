@@ -80,6 +80,34 @@ function test_SolverName()
     return
 end
 
+"""
+    test_row_index_integer_width()
+
+Row indices must not be dispatched on `Int`. On 32-bit platforms `Int === Int32`,
+while MOI index values and attributes such as `MOI.NumberOfVariables` are `Int64`
+on every platform, so mixing the two (e.g. `row - n`) promotes the row index to
+`Int64` and no `::Int` method matches. See DAQP.jl issue #25.
+"""
+function test_row_index_integer_width()
+    @test fieldtype(DAQP.Optimizer, :rows) == Dict{Int64,Int64}
+    idxmap = typeof(MOI.Utilities.IndexMap())
+    affine = MOI.ScalarAffineFunction{Cdouble}
+    interval = MOI.Interval{Cdouble}
+    for T in (Int32, Int64)
+        @test hasmethod(DAQP.extract_offset, Tuple{Vector{Cdouble},T,affine})
+        @test hasmethod(DAQP.extract_offset, Tuple{Vector{Cdouble},T,MOI.VariableIndex})
+        @test hasmethod(DAQP.extract_A, Tuple{Matrix{Cdouble},affine,T,idxmap})
+        @test hasmethod(DAQP.extract_A, Tuple{Matrix{Cdouble},MOI.VariableIndex,T,idxmap})
+        @test hasmethod(DAQP.extract_b,
+                        Tuple{Vector{Cdouble},Vector{Cdouble},Vector{Cint},T,affine,interval})
+        @test hasmethod(DAQP.extract_b,
+                        Tuple{Vector{Cdouble},Vector{Cdouble},Vector{Cint},T,MOI.VariableIndex,interval})
+        @test hasmethod(DAQP.extract_b,
+                        Tuple{Vector{Cdouble},Vector{Cdouble},Vector{Cint},T,interval})
+    end
+    return
+end
+
 end # module TestMOIDAQP 
 
 # This line at tne end of the file runs all the tests!
