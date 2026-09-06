@@ -113,13 +113,14 @@ end
 
 `MOI.NumberOfVariables` and `MOI.ResultCount` are queried directly on the
 `DAQP.Optimizer` (a cached/bridged optimizer answers them from its own cache, so
-`MOI.Test` never reaches these methods). Both must return an `Int64`, as required
-by `MOI.attribute_value_type`.
+`MOI.Test` never reaches these methods). Their specified return types differ:
+`NumberOfVariables` returns `Int64`, while `ResultCount` returns the native
+`Int`, including on 32-bit platforms.
 """
 function test_NumberOfVariables()
     opt = DAQP.Optimizer()
     @test MOI.get(opt, MOI.NumberOfVariables()) === Int64(0)
-    @test MOI.get(opt, MOI.ResultCount()) === Int64(0)
+    @test MOI.get(opt, MOI.ResultCount()) === Int(0)
 
     # min 0.5*(x1^2+x2^2) s.t. x1 >= 1, x2 >= 1, x1+x2 <= 5
     src = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Cdouble}())
@@ -139,14 +140,14 @@ function test_NumberOfVariables()
 
     @test MOI.get(opt, MOI.NumberOfVariables()) === Int64(2)
     MOI.optimize!(opt)
-    @test MOI.get(opt, MOI.ResultCount()) === Int64(1)
+    @test MOI.get(opt, MOI.ResultCount()) === Int(1)
     @test MOI.get(opt, MOI.TerminationStatus()) == MOI.OPTIMAL
     @test MOI.get(opt, MOI.VariablePrimal(), idxmap[x[1]]) ≈ 1.0 atol = 1e-6
     @test MOI.get(opt, MOI.VariablePrimal(), idxmap[x[2]]) ≈ 1.0 atol = 1e-6
 
     MOI.empty!(opt)
     @test MOI.get(opt, MOI.NumberOfVariables()) === Int64(0)
-    @test MOI.get(opt, MOI.ResultCount()) === Int64(0)
+    @test MOI.get(opt, MOI.ResultCount()) === Int(0)
     return
 end
 
