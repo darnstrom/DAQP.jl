@@ -154,11 +154,8 @@ end
 MOI.get(opt::Optimizer, ::MOI.SolverName)        = "DAQP" 
 MOI.get(opt::Optimizer, ::MOI.SolverVersion)     = "0.5.0"
 MOI.get(opt::Optimizer, ::MOI.RawSolver)         = opt.model
-MOI.get(opt::Optimizer, ::MOI.ResultCount)       = opt.has_results ? Int64(1) : Int64(0)
-# `DAQP.Model` only holds the problem dimensions once a problem has been setup,
-# which for the MOI wrapper happens in `copy_to` (i.e., when `is_empty` is false).
-MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) =
-    opt.is_empty ? Int64(0) : Int64(opt.model.qpj.n)
+MOI.get(opt::Optimizer, ::MOI.ResultCount)       = opt.has_results ? 1 : 0
+MOI.get(opt::Optimizer, ::MOI.NumberOfVariables) = opt.is_empty ? 0 : opt.model.qpj.n
 MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)      = opt.info.solve_time+opt.setup_time
 MOI.get(opt::Optimizer, ::MOI.RawStatusString)   = string(opt.info.status)
 MOI.get(opt::Optimizer, ::MOI.SimplexIterations) = Int64(opt.info.iterations)
